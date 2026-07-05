@@ -1,0 +1,20 @@
+# Armsmith rule descriptor — R3
+id: R3
+title: NumPy/SciPy linked against reference BLAS instead of an optimized backend
+kind: probe
+requires: [numpy_show_config]
+summary: >
+  numpy.show_config() output shows no optimized BLAS (OpenBLAS / BLIS / Arm
+  Performance Libraries / Accelerate); matrix math falls back to the netlib
+  reference implementation, which is dramatically slower on Neoverse cores
+  and typical of distro python + source-built numpy on arm64.
+fix_generator: >
+  Reinstall NumPy/SciPy from official PyPI manylinux aarch64 wheels (which
+  bundle OpenBLAS), or rebuild against OpenBLAS/ArmPL; pin the wheel in the
+  lockfile so the fix sticks.
+expected_gain_range: [1.5, 5.0]
+gain_note: >
+  ESTIMATE — reference-BLAS penalties are workload-dependent (largest for
+  GEMM-heavy embed paths). Only gate-measured deltas are ever claimed.
+citation_url: https://numpy.org/doc/stable/reference/generated/numpy.show_config.html
+confidence: high

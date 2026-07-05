@@ -1,0 +1,22 @@
+# Armsmith rule descriptor — R2
+id: R2
+title: Native build without -mcpu/-march (generic aarch64 codegen)
+# "static+runtime" in ARCHITECTURE terms; the detector's mechanism is probe-
+# only (recorded compiler invocations + lscpu), so no repo checkout is needed.
+kind: probe
+requires: [build_log, lscpu]
+summary: >
+  Compiler invocations in the build log compile C/C++ sources with
+  optimization flags but no -mcpu=/-march= target, so GCC/Clang emit
+  lowest-common-denominator ARMv8.0 code and never use dotprod/i8mm/SVE
+  even when the host CPU reports them.
+fix_generator: >
+  Inject -mcpu=native (preferred on native builds) or an explicit
+  -march=armv8.2-a+dotprod(+i8mm) matching the detected ISA features into
+  CFLAGS/CXXFLAGS for the native extension build.
+expected_gain_range: [1.1, 1.5]
+gain_note: >
+  ESTIMATE from compiler documentation; real gain depends on how hot the
+  native extension is. The reproduce gate decides.
+citation_url: https://gcc.gnu.org/onlinedocs/gcc/AArch64-Options.html
+confidence: medium

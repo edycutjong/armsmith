@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets — never commit private keys or local env files
+# (the S1 Claude planner reads its API key from the environment; keep .env local)
+*.pem
+.armsmith/
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+
+# Editors
+.idea/
+.vscode/
+
+# Asset pipeline node deps (docs/assets/ keeps sources, not node_modules)
+docs/assets/node_modules/

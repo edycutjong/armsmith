@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "command": "llama-cli -m model.gguf -p @prompt.txt -n 128 --no-display-prompt",
+      "mean": 4.03,
+      "stddev": 0.048305,
+      "median": 4.02,
+      "min": 3.97,
+      "max": 4.1,
+      "times": [
+        4.02,
+        3.99,
+        4.08,
+        4.0,
+        4.05,
+        3.97,
+        4.1
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

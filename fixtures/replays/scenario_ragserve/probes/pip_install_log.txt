@@ -1,0 +1,4 @@
+Collecting numpy==1.24.0
+  Downloading numpy-1.24.0.tar.gz (10.9 MB)
+Building wheels for collected packages: numpy
+  Building wheel for numpy (pyproject.toml): finished with status 'done'

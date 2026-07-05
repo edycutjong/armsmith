@@ -1,0 +1,4 @@
+services:
+  api:
+    build: .
+    platform: linux/amd64

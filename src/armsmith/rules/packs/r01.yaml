@@ -1,0 +1,21 @@
+# Armsmith rule descriptor — R1
+id: R1
+title: amd64-pinned container image (QEMU emulation on Arm)
+kind: static
+requires: []
+summary: >
+  A Dockerfile FROM line pinned to linux/amd64 (via --platform=linux/amd64 or
+  an amd64/ image prefix), or a compose service pinned to linux/amd64, forces
+  the container to run under QEMU user-mode emulation on aarch64 hosts —
+  typically several times slower than native arm64.
+fix_generator: >
+  Remove the amd64 platform pin (or switch to a multi-arch base image /
+  arm64 digest) so the arm64 image variant is selected natively; add a buildx
+  multi-platform build if the base image is single-arch.
+expected_gain_range: [2.0, 10.0]
+gain_note: >
+  ESTIMATE from the citation (emulation overhead varies wildly by workload).
+  Never claimed as a result — the reproduce gate measures the actual delta
+  per repo.
+citation_url: https://docs.docker.com/build/building/multi-platform/
+confidence: high

@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "provenance": "hand-authored synthetic fixture for offline tests; values are illustrative shapes only and were NOT measured on any hardware",
+  "variant": "fix_R11",
+  "rule_id": "R11",
+  "instrument": "hyperfine",
+  "metrics": {
+    "wall_s": [
+      2.0,
+      1.97,
+      2.02,
+      2.0,
+      1.98,
+      2.01,
+      2.0
+    ],
+    "rss_peak_mb": [
+      511.0,
+      513.0,
+      510.5,
+      512.0,
+      511.5,
+      512.0,
+      512.5
+    ]
+  },
+  "pmu": {
+    "cycles": 7900000000.0,
+    "instructions": 10000000000.0,
+    "ipc": 1.27,
+    "cache_miss_pct": 8.0
+  },
+  "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+}

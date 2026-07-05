@@ -1,0 +1,21 @@
+# Armsmith rule descriptor — R4
+id: R4
+title: Silent float64 coercion in embed/preprocess paths
+kind: static
+requires: []
+summary: >
+  numpy array constructors (np.array / zeros / ones / empty / full /
+  linspace) called without an explicit dtype default to float64 for float
+  inputs. Embedding and preprocessing pipelines silently double memory
+  traffic and halve SIMD lane width on aarch64, then usually cast to
+  float32 at the model boundary anyway.
+fix_generator: >
+  Pin dtype=np.float32 at each flagged constructor call site (patch lists
+  every file:line); keep an explicit cast only at the model boundary.
+expected_gain_range: [1.3, 2.0]
+gain_note: >
+  ESTIMATE (2x data volume + half NEON lane width upper bound); actual
+  effect measured by the reproduce gate with output-hash equality checked
+  at fp32 tolerance policy defined per adapter.
+citation_url: https://numpy.org/doc/stable/reference/arrays.dtypes.html
+confidence: high

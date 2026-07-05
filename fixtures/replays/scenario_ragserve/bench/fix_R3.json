@@ -1,0 +1,34 @@
+{
+  "synthetic": true,
+  "provenance": "hand-authored synthetic fixture for offline tests; values are illustrative shapes only and were NOT measured on any hardware",
+  "variant": "fix_R3",
+  "rule_id": "R3",
+  "instrument": "hyperfine",
+  "metrics": {
+    "wall_s": [
+      1.31,
+      1.29,
+      1.32,
+      1.3,
+      1.3,
+      1.31,
+      1.29
+    ],
+    "rss_peak_mb": [
+      512.0,
+      513.0,
+      511.5,
+      512.5,
+      512.0,
+      513.0,
+      512.0
+    ]
+  },
+  "pmu": {
+    "cycles": 5300000000.0,
+    "instructions": 8900000000.0,
+    "ipc": 1.68,
+    "cache_miss_pct": 6.0
+  },
+  "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+}

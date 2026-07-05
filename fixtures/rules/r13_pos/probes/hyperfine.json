@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "command": "python summarize.py --prompt-file prompts_50.txt",
+      "mean": 5.61,
+      "stddev": 0.068313,
+      "median": 5.6,
+      "min": 5.52,
+      "max": 5.71,
+      "times": [
+        5.6,
+        5.55,
+        5.68,
+        5.58,
+        5.63,
+        5.52,
+        5.71
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+blas_info:
+    libraries = ['blas', 'cblas']
+    library_dirs = ['/usr/lib/aarch64-linux-gnu']
+    language = c
+blas_opt_info:
+    libraries = ['blas', 'cblas']
+lapack_info:
+    libraries = ['lapack']
+openblas_info:
+  NOT AVAILABLE
+openblas_lapack_info:
+  NOT AVAILABLE

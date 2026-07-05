@@ -1,0 +1,20 @@
+# Armsmith rule descriptor — R11
+id: R11
+title: Missing THP/allocator tuning for large-model RSS
+kind: probe
+requires: [thp, proc_maps]
+summary: >
+  Transparent hugepages disabled ([never]) and/or no modern allocator
+  (tcmalloc/jemalloc) mapped into the serving process: large model heaps
+  then pay 4K-page TLB pressure and glibc-malloc fragmentation — a steady
+  tax on multi-GB RSS inference workloads.
+fix_generator: >
+  Set THP to madvise (kernel admin guide), and/or LD_PRELOAD
+  libjemalloc/libtcmalloc for the serving process; both knobs are
+  environment-level (no code change) and A/B-able through the gate.
+expected_gain_range: [1.05, 1.3]
+gain_note: >
+  ESTIMATE — allocator/THP effects are workload- and RSS-dependent and
+  often small; in-band results are reported as "no change" and dropped.
+citation_url: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
+confidence: medium

@@ -1,0 +1,4 @@
+blas_info:
+    libraries = ['blas', 'cblas']
+openblas_info:
+  NOT AVAILABLE

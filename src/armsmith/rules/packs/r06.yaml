@@ -1,0 +1,20 @@
+# Armsmith rule descriptor — R6
+id: R6
+title: Thread oversubscription (threads x workers > vCPUs)
+kind: probe
+requires: [env]
+summary: >
+  Each worker process spawns a full complement of OpenMP/BLAS threads (the
+  default is one per vCPU when OMP_NUM_THREADS is unset), so N workers x
+  nproc threads thrash a box with only nproc vCPUs — context-switch storms
+  and cache eviction instead of throughput.
+fix_generator: >
+  Set OMP_NUM_THREADS (and sibling knobs like OPENBLAS_NUM_THREADS) to
+  floor(nproc / workers), or reduce worker count, so total runnable threads
+  match the vCPU budget.
+expected_gain_range: [1.2, 3.0]
+gain_note: >
+  ESTIMATE — oversubscription penalties grow with worker count and context
+  size; the reproduce gate measures the actual recovery.
+citation_url: https://gcc.gnu.org/onlinedocs/libgomp/OMP_005fNUM_005fTHREADS.html
+confidence: high

@@ -1,0 +1,5 @@
+# Overhead  Command  Shared Object       Symbol
+    41.30%  python   libggml.so          [.] ggml_vec_dot_q4_0_q8_0
+    12.10%  python   libggml.so          [.] ggml_compute_forward_mul_mat
+     5.90%  python   libc.so.6           [.] __memcpy_generic
+     3.10%  python   libopenblas.so      [.] sgemm_kernel

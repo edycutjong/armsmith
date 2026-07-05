@@ -1,0 +1,22 @@
+# Armsmith rule descriptor — R9
+id: R9
+title: Tokenizer/preprocess memcpy storm in the hot path
+kind: probe
+requires: [perf_report]
+summary: >
+  perf report attributes a large share of cycles (>= 15%) to
+  memcpy/memmove/memset — the classic signature of per-token string
+  slicing, repeated buffer reallocation, or copy-per-request
+  serialization in tokenizer and preprocessing code.
+fix_generator: >
+  The only LLM-creative rule: the planner drafts a batch/zero-copy rewrite
+  suggestion for the identified call site (memoryview/pre-allocated
+  buffers/batched tokenization). Deterministic fallback emits the hot-symbol
+  evidence and generic zero-copy guidance; any drafted patch must pass the
+  reproduce gate like every other fix.
+expected_gain_range: [1.1, 1.6]
+gain_note: >
+  ESTIMATE — bounded by the memcpy share of cycles observed in perf; the
+  gate re-measures end-to-end.
+citation_url: https://perf.wiki.kernel.org/index.php/Tutorial
+confidence: low

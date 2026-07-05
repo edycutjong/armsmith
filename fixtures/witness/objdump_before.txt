@@ -1,0 +1,11 @@
+0000000000401000 <gemm_kernel_generic>:
+  401000:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+  401004:	910003fd 	mov	x29, sp
+  401008:	4ea01c00 	mov	v0.16b, v0.16b
+  40100c:	4e20d401 	fadd	v1.4s, v0.4s, v0.4s
+  401010:	4e21d422 	fadd	v2.4s, v1.4s, v1.4s
+  401014:	6e21dc23 	fmul	v3.4s, v1.4s, v1.4s
+  401018:	f9400021 	ldr	x1, [x1]
+  40101c:	91000421 	add	x1, x1, #0x1
+  401020:	a8c27bfd 	ldp	x29, x30, [sp], #32
+  401024:	d65f03c0 	ret

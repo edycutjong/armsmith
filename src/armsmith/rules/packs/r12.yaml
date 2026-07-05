@@ -1,0 +1,23 @@
+# Armsmith rule descriptor — R12
+id: R12
+title: CI publishes amd64-only images (no arm64 in the build matrix)
+kind: static
+requires: []
+summary: >
+  The GitHub Actions workflow builds/pushes Docker images without an arm64
+  platform (docker/build-push-action without platforms including
+  linux/arm64, or a plain docker build on an x86 runner) — every Arm
+  consumer of the published image is silently forced into emulation (R1 on
+  their side).
+fix_generator: >
+  Add platforms linux/amd64,linux/arm64 to the buildx step (with
+  setup-qemu/setup-buildx), or build natively on the free public-repo arm64
+  runners (labels ubuntu-24.04-arm / ubuntu-22.04-arm, verified in
+  crawl/clean/sdk_github-arm64-runners.md).
+expected_gain_range: [1.0, 1.0]
+gain_note: >
+  Ecosystem/correctness fix: no local speedup is claimed (range pinned to
+  1.0x). The runtime gain lands on consumers who stop pulling emulated
+  images — that side is R1's measurement.
+citation_url: https://github.com/docker/build-push-action
+confidence: high

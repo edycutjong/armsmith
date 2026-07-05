@@ -1,0 +1,4 @@
+# Overhead  Command  Shared Object     Symbol
+    38.20%  python   libblas.so.3      [.] dgemm_
+    11.40%  python   libpython3.12.so  [.] _PyEval_EvalFrameDefault
+     6.10%  python   libc.so.6         [.] __memcpy_generic

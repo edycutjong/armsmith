@@ -1,0 +1,2 @@
+gcc -O3 -mcpu=neoverse-v2 -fPIC -c src/fastpath.c -o build/fastpath.o
+gcc -O3 -mcpu=neoverse-v2 -fPIC -c src/tokenize.c -o build/tokenize.o

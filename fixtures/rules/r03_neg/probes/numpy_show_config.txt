@@ -1,0 +1,11 @@
+Build Dependencies:
+  blas:
+    detection method: pkgconfig
+    found: true
+    include directory: /usr/local/include
+    name: openblas64
+    openblas configuration: USE_64BITINT=1 DYNAMIC_ARCH=0 NEOVERSEV1 MAX_THREADS=64
+    version: 0.3.27
+  lapack:
+    name: openblas64
+    found: true

@@ -1,0 +1,19 @@
+[
+  {
+    "build_commit": "synthetic",
+    "model_type": "synthetic 3B",
+    "n_prompt": 0,
+    "n_gen": 128,
+    "avg_ts": 90.0,
+    "stddev_ts": 0.318479,
+    "samples_ts": [
+      50.0,
+      49.6,
+      50.5,
+      49.9,
+      50.3,
+      49.7,
+      50.1
+    ]
+  }
+]

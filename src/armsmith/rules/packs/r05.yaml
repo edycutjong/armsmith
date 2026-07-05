@@ -1,0 +1,21 @@
+# Armsmith rule descriptor — R5
+id: R5
+title: GGUF quant format mismatched to target ISA runtime-repack path
+kind: probe
+requires: [gguf_header, lscpu]
+summary: >
+  llama.cpp runtime-repacks Q4_0 weights into aarch64-optimized layouts when
+  dotprod/i8mm are present; K-quants skip that fast path, and Q4_0 on a host
+  WITHOUT dotprod cannot repack at all. Either direction leaves tokens/sec
+  on the table for the silicon actually being used.
+fix_generator: >
+  Propose the quant variant matched to the detected ISA (Q4_0 to engage the
+  repack path on dotprod/i8mm hosts; a K-quant where repack cannot engage)
+  and A/B both GGUFs through the reproduce gate.
+expected_gain_range: [1.2, 2.0]
+gain_note: >
+  ESTIMATE from llama.cpp Arm build documentation; quant swaps also shift
+  quality, so the fix always states the perplexity trade and the gate
+  measures speed only.
+citation_url: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md
+confidence: medium

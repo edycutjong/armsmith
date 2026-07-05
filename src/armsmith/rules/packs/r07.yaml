@@ -1,0 +1,20 @@
+# Armsmith rule descriptor — R7
+id: R7
+title: ONNX Runtime session left on defaults (threads / graph optimization)
+kind: probe
+requires: [ort_session]
+summary: >
+  SessionOptions with intra_op_num_threads=0 lets every worker grab all
+  cores (oversubscription once workers > 1), and a graph optimization level
+  below ORT_ENABLE_ALL leaves fusions and layout optimizations off — both
+  are silent defaults that cost latency on aarch64 CPU inference.
+fix_generator: >
+  Emit a session-options patch: intra_op_num_threads = floor(nproc/workers),
+  inter_op_num_threads = 1, graph_optimization_level = ORT_ENABLE_ALL
+  (default CPU EP; ACL EP is community-maintained and mention-only).
+expected_gain_range: [1.2, 1.8]
+gain_note: >
+  ESTIMATE from ONNX Runtime performance-tuning guidance; gate-verified
+  per model/pipeline.
+citation_url: https://onnxruntime.ai/docs/performance/tune-performance/threading.html
+confidence: high

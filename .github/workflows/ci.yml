@@ -1,0 +1,54 @@
+# Armsmith CI — runs the hardware-free replay suite on native arm64 + x86.
+# Labels ubuntu-24.04-arm / ubuntu-22.04-arm are the verified free public-repo
+# arm64 runners (crawl/clean/sdk_github-arm64-runners.md). Everything in this
+# suite is replay/fixture-based, so it needs zero Arm-specific setup — the
+# arm64 leg simply proves the package is arch-clean and doubles as the
+# substrate for the S1+ live-bench jobs.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+# Cancel superseded runs on the same ref to save arm64 preview-runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, ubuntu-22.04-arm, ubuntu-latest]
+        python-version: ["3.11", "3.12"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e '.[dev]'
+      - name: Lint (ruff)
+        run: .venv/bin/ruff check .
+      - name: Types (mypy — advisory)
+        run: .venv/bin/mypy src
+        continue-on-error: true
+      - name: Unit + replay suite (208 tests) with coverage
+        run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
+      - name: Offline end-to-end (scan → gate → sign → verify)
+        run: .venv/bin/python scripts/verify_offline.py
+      - name: Report schema is valid JSON Schema
+        run: .venv/bin/python -c "import json, jsonschema; jsonschema.Draft202012Validator.check_schema(json.load(open('schema/report.schema.json')))"
+      - name: Dependency audit (pip-audit — advisory)
+        run: |
+          .venv/bin/pip install pip-audit
+          .venv/bin/pip-audit --skip-editable
+        continue-on-error: true
+
+  # TODO(S1): live-bench job on the arm64 runners — hyperfine/llama-bench
+  # measured legs, cosign keyless attestation of report.json (OIDC), and the
+  # noise-floor study matrix across both arm labels.

@@ -1,0 +1,7 @@
+# Overhead  Command  Shared Object       Symbol
+# ........  .......  ..................  ..........................
+    28.40%  python   libc.so.6           [.] __memcpy_generic
+     9.10%  python   libc.so.6           [.] __memmove_generic
+     8.75%  python   _tokenizer.so       [.] tokenize_batch
+     4.20%  python   libpython3.12.so    [.] PyBytes_Concat
+     2.05%  python   libc.so.6           [.] __memset_generic

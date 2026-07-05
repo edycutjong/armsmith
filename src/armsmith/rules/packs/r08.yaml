@@ -1,0 +1,20 @@
+# Armsmith rule descriptor — R8
+id: R8
+title: pip fell back to sdist build for a performance-critical package
+kind: probe
+requires: [pip_install_log]
+summary: >
+  The install log shows a perf-critical package (numpy, pillow, tokenizers,
+  onnxruntime, ...) downloaded as a .tar.gz sdist and compiled in-place
+  instead of installing a manylinux aarch64 wheel — source builds routinely
+  miss the tuned NEON/OpenBLAS configuration the official wheels ship.
+fix_generator: >
+  Pin the package to a version that publishes manylinux_*_aarch64 wheels
+  (or a newer Python/base image that has them) and enforce
+  --only-binary=:all: for the watchlist in CI.
+expected_gain_range: [1.2, 3.0]
+gain_note: >
+  ESTIMATE — depends on which kernels the local build missed; the gate
+  measures the wheel-vs-sdist delta directly.
+citation_url: https://pip.pypa.io/en/stable/cli/pip_install/
+confidence: medium

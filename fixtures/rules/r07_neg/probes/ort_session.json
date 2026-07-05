@@ -1,0 +1,8 @@
+{
+  "intra_op_num_threads": 4,
+  "inter_op_num_threads": 1,
+  "graph_optimization_level": "ORT_ENABLE_ALL",
+  "execution_mode": "ORT_SEQUENTIAL",
+  "workers": 4,
+  "nproc": 16
+}

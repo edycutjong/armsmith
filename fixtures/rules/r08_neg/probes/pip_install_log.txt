@@ -1,0 +1,5 @@
+Collecting numpy==1.26.4
+  Downloading numpy-1.26.4-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl (14.2 MB)
+Collecting requests
+  Downloading requests-2.32.3-py3-none-any.whl (64 kB)
+Installing collected packages: numpy, requests
