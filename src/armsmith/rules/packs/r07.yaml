@@ -18,3 +18,4 @@ gain_note: >
   per model/pipeline.
 citation_url: https://onnxruntime.ai/docs/performance/tune-performance/threading.html
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/onnx/

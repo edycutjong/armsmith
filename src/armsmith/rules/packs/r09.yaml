@@ -20,3 +20,4 @@ gain_note: >
   gate re-measures end-to-end.
 citation_url: https://perf.wiki.kernel.org/index.php/Tutorial
 confidence: low
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama_cpp_streamline/

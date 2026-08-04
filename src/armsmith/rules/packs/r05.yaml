@@ -19,3 +19,4 @@ gain_note: >
   measures speed only.
 citation_url: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md
 confidence: medium
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama-cpu/

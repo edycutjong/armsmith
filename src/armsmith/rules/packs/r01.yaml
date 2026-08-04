@@ -19,3 +19,4 @@ gain_note: >
   per repo.
 citation_url: https://docs.docker.com/build/building/multi-platform/
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/multiarch_nginx_on_aks/

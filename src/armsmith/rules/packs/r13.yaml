@@ -22,3 +22,4 @@ gain_note: >
   value is redirected effort, quantified from two real instruments.
 citation_url: https://github.com/ggml-org/llama.cpp/tree/master/tools/llama-bench
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama_cpp_streamline/

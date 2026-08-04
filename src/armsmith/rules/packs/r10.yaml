@@ -19,3 +19,4 @@ gain_note: >
   reproduce gate and only the measured delta is reported.
 citation_url: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama-cpu/

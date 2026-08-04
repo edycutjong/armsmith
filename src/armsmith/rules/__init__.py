@@ -73,6 +73,11 @@ def _parse_descriptor(path: Path) -> RuleSpec:
     url = str(data["citation_url"])
     if not url.startswith("https://"):
         raise ValueError(f"{path}: citation_url must be https")
+    lp = data.get("learning_path")
+    if lp is not None:
+        lp = str(lp)
+        if not lp.startswith("https://"):
+            raise ValueError(f"{path}: learning_path must be https when present")
     return RuleSpec(
         id=str(data["id"]),
         title=str(data["title"]).strip(),
@@ -83,6 +88,7 @@ def _parse_descriptor(path: Path) -> RuleSpec:
         expected_gain_range=(float(gain[0]), float(gain[1])),
         gain_note=str(data["gain_note"]).strip(),
         citation_url=url,
+        learning_path=lp,
         confidence=str(data["confidence"]),
     )
 

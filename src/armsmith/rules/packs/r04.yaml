@@ -19,3 +19,4 @@ gain_note: >
   at fp32 tolerance policy defined per adapter.
 citation_url: https://numpy.org/doc/stable/reference/arrays.dtypes.html
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/multi-accuracy-libamath/

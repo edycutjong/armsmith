@@ -50,6 +50,10 @@ class RuleSpec:
     gain_note: str
     citation_url: str
     confidence: str                 # high | medium | low
+    #: Arm Learning Path that teaches this fix by hand (the rubric's
+    #: "learning-ready content"). None where no strong Arm LP exists — those
+    #: rules honestly cite only their upstream ``citation_url``.
+    learning_path: str | None = None
 
     def gain_midpoint(self) -> float:
         lo, hi = self.expected_gain_range
@@ -66,6 +70,7 @@ class RuleSpec:
             "expected_gain_range": list(self.expected_gain_range),
             "gain_note": self.gain_note,
             "citation_url": self.citation_url,
+            "learning_path": self.learning_path,
             "confidence": self.confidence,
         }
 

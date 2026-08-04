@@ -21,3 +21,4 @@ gain_note: >
   images — that side is R1's measurement.
 citation_url: https://github.com/docker/build-push-action
 confidence: high
+learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/multiarch_nginx_on_aks/
