@@ -30,4 +30,4 @@ htmlcov/
 .vscode/
 
 # Asset pipeline node deps (docs/assets/ keeps sources, not node_modules)
-docs/assets/node_modules/
+docs/assets
