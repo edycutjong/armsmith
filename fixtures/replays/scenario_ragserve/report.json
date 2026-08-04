@@ -1,0 +1,1330 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "1051531a-f94f-4814-802f-f2fa711aa969",
+  "created_at": "2026-08-04T06:14:27.729611+00:00",
+  "mode": "replay",
+  "synthetic": true,
+  "tool": {
+    "name": "armsmith",
+    "version": "0.1.0"
+  },
+  "scenario": "scenario_ragserve",
+  "repo": {
+    "url": "https://github.com/example/ragserve",
+    "sha": "0000000000000000000000000000000000000000"
+  },
+  "host": {
+    "architecture": "aarch64",
+    "model_name": "Neoverse-V2",
+    "vendor": "ARM",
+    "cpus": 16,
+    "isa_feats": [
+      "dotprod",
+      "i8mm",
+      "sve",
+      "sve2",
+      "bf16"
+    ],
+    "isa": {
+      "dotprod": true,
+      "i8mm": true,
+      "sve": true,
+      "sve2": true,
+      "bf16": true,
+      "sme": false
+    },
+    "instance": "synthetic-c8g.4xlarge",
+    "kernel": "6.8.0-synthetic",
+    "governor": "performance",
+    "source": "replay[SYNTHETIC]: scenario_ragserve"
+  },
+  "gate_config": {
+    "band_k": 3.0,
+    "min_samples": 3,
+    "require_output_hash": true,
+    "primary_metrics": null
+  },
+  "findings": [
+    {
+      "rule_id": "R1",
+      "status": "matched",
+      "evidence": [
+        "Dockerfile:1: FROM pinned to linux/amd64 \u2192 QEMU emulation on arm64 hosts"
+      ],
+      "locations": [
+        "Dockerfile:1"
+      ],
+      "fix": {
+        "rule_id": "R1",
+        "kind": "dockerfile_edit",
+        "description": "Remove the amd64 platform pin so the native arm64 image variant is pulled; if the base image is amd64-only, switch to a multi-arch base or add a buildx multi-platform build.",
+        "patch": "- FROM --platform=linux/amd64 python:3.12-slim\n+ FROM python:3.12-slim",
+        "commands": [
+          "docker buildx imagetools inspect <base-image>  # confirm arm64 variant exists"
+        ]
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R2",
+      "status": "skipped",
+      "evidence": [],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": "probe data not recorded: ['build_log']"
+    },
+    {
+      "rule_id": "R3",
+      "status": "matched",
+      "evidence": [
+        "no optimized BLAS (OpenBLAS/BLIS/ArmPL/Accelerate/MKL) in numpy.show_config()",
+        "reference-BLAS marker: \"libraries = ['blas'\"",
+        "1 backend section(s) report NOT AVAILABLE"
+      ],
+      "locations": [
+        "probe:numpy_show_config"
+      ],
+      "fix": {
+        "rule_id": "R3",
+        "kind": "pip_pin",
+        "description": "Reinstall NumPy from the official PyPI manylinux aarch64 wheel (bundles OpenBLAS) instead of the distro/source build, and pin it in the lockfile.",
+        "patch": "numpy>=1.26  # official manylinux_aarch64 wheels bundle OpenBLAS",
+        "commands": [
+          "pip install --force-reinstall --only-binary=:all: numpy",
+          "python -c \"import numpy; numpy.show_config()\"  # re-verify backend"
+        ]
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R4",
+      "status": "matched",
+      "evidence": [
+        "app.py:5: np.array(...) without dtype= \u2014 floats default to float64",
+        "app.py:6: np.ones(...) without dtype= \u2014 floats default to float64"
+      ],
+      "locations": [
+        "app.py:5",
+        "app.py:6"
+      ],
+      "fix": {
+        "rule_id": "R4",
+        "kind": "code_suggestion",
+        "description": "Pin dtype=np.float32 at each flagged numpy constructor call site; keep a single explicit cast at the model boundary if float64 is genuinely required somewhere.",
+        "patch": "app.py:5: add dtype=np.float32 to np.array(...)\napp.py:6: add dtype=np.float32 to np.ones(...)",
+        "commands": []
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R5",
+      "status": "skipped",
+      "evidence": [],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": "probe data not recorded: ['gguf_header']"
+    },
+    {
+      "rule_id": "R6",
+      "status": "matched",
+      "evidence": [
+        "workers(4) \u00d7 threads/worker(16) = 64 runnable threads on 16 vCPUs (4.0\u00d7 oversubscribed)",
+        "thread source: no thread env set \u2192 OpenMP default = nproc per worker",
+        "worker source: Dockerfile CMD gunicorn -w 4 (recorded)"
+      ],
+      "locations": [
+        "probe:env"
+      ],
+      "fix": {
+        "rule_id": "R6",
+        "kind": "env_change",
+        "description": "Cap per-worker threads so workers \u00d7 threads matches the vCPU budget: OMP_NUM_THREADS=4 (and mirror to OPENBLAS_NUM_THREADS) with 4 workers on 16 vCPUs.",
+        "patch": "OMP_NUM_THREADS=4\nOPENBLAS_NUM_THREADS=4",
+        "commands": []
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R7",
+      "status": "skipped",
+      "evidence": [],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": "probe data not recorded: ['ort_session']"
+    },
+    {
+      "rule_id": "R8",
+      "status": "matched",
+      "evidence": [
+        "numpy-1.24.0 downloaded as sdist \u2014 no aarch64 wheel used (wheel built from source in this log)"
+      ],
+      "locations": [
+        "probe:pip_install_log"
+      ],
+      "fix": {
+        "rule_id": "R8",
+        "kind": "pip_pin",
+        "description": "Pin flagged packages to versions that publish manylinux aarch64 wheels and enforce --only-binary for the watchlist so CI fails loudly instead of silently compiling untuned builds.",
+        "patch": "numpy  # pin to a release with manylinux_*_aarch64 wheels",
+        "commands": [
+          "pip install --only-binary=:all: numpy"
+        ]
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R9",
+      "status": "clean",
+      "evidence": [
+        "memcpy-family symbols account for 6.1% of cycles (< 15% threshold)"
+      ],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R10",
+      "status": "skipped",
+      "evidence": [],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": "probe data not recorded: ['cmake_cache']"
+    },
+    {
+      "rule_id": "R11",
+      "status": "matched",
+      "evidence": [
+        "transparent hugepages disabled (enabled='always madvise [never]') \u2014 multi-GB model heaps pay 4K-page TLB pressure",
+        "no tcmalloc/jemalloc mapped \u2014 glibc malloc fragmentation tax on long-lived multi-GB heaps",
+        "THP raw: 'always madvise [never]'",
+        "allocators in maps: none"
+      ],
+      "locations": [
+        "probe:thp",
+        "probe:proc_maps"
+      ],
+      "fix": {
+        "rule_id": "R11",
+        "kind": "env_change",
+        "description": "Environment-level tuning, A/B-able with zero code change: set THP to madvise and/or preload a modern allocator for the serving process.",
+        "patch": "# THP (needs root; persist via tuned/sysfs unit)\necho madvise > /sys/kernel/mm/transparent_hugepage/enabled\n# allocator preload for the serving process\nLD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2",
+        "commands": []
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R12",
+      "status": "matched",
+      "evidence": [
+        ".github/workflows/publish.yml: job 'image' step 2: build-push-action platforms=(unset \u2192 runner arch only) \u2014 no linux/arm64"
+      ],
+      "locations": [
+        ".github/workflows/publish.yml"
+      ],
+      "fix": {
+        "rule_id": "R12",
+        "kind": "ci_patch",
+        "description": "Add linux/arm64 to the image build matrix: either platforms: linux/amd64,linux/arm64 on the buildx step (with docker/setup-qemu-action + docker/setup-buildx-action), or build natively on the free public-repo arm64 runners.",
+        "patch": "# option A \u2014 buildx multi-arch on the existing runner\n      - uses: docker/setup-qemu-action@v3\n      - uses: docker/setup-buildx-action@v3\n      - uses: docker/build-push-action@v6\n        with:\n          platforms: linux/amd64,linux/arm64\n# option B \u2014 native arm64 job (free for public repos)\n  build-arm64:\n    runs-on: ubuntu-24.04-arm\n",
+        "commands": []
+      },
+      "skipped_reason": null
+    },
+    {
+      "rule_id": "R13",
+      "status": "skipped",
+      "evidence": [],
+      "locations": [],
+      "fix": null,
+      "skipped_reason": "probe data not recorded: ['llama_bench', 'hyperfine']"
+    }
+  ],
+  "plan": [
+    {
+      "rule_id": "R1",
+      "rationale": "confidence=high, expected-gain midpoint 6.00x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 0
+    },
+    {
+      "rule_id": "R3",
+      "rationale": "confidence=high, expected-gain midpoint 3.25x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 1
+    },
+    {
+      "rule_id": "R6",
+      "rationale": "confidence=high, expected-gain midpoint 2.10x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 2
+    },
+    {
+      "rule_id": "R4",
+      "rationale": "confidence=high, expected-gain midpoint 1.65x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 3
+    },
+    {
+      "rule_id": "R12",
+      "rationale": "confidence=high, expected-gain midpoint 1.00x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 4
+    },
+    {
+      "rule_id": "R8",
+      "rationale": "confidence=medium, expected-gain midpoint 2.10x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 5
+    },
+    {
+      "rule_id": "R11",
+      "rationale": "confidence=medium, expected-gain midpoint 1.18x (estimate for ordering only; the reproduce gate decides)",
+      "priority": 6
+    }
+  ],
+  "baseline": {
+    "variant": "baseline",
+    "instrument": "hyperfine",
+    "rule_id": null,
+    "synthetic": true,
+    "samples": {
+      "wall_s": [
+        2.01,
+        1.98,
+        2.03,
+        2.0,
+        1.99,
+        2.02,
+        2.0
+      ],
+      "rss_peak_mb": [
+        512.0,
+        514.0,
+        511.0,
+        513.0,
+        512.0,
+        512.5,
+        513.5
+      ]
+    },
+    "metrics_summary": {
+      "wall_s": {
+        "n": 7,
+        "median": 2.0,
+        "mad": 0.010000000000000009,
+        "smad": 0.014826000000000013,
+        "p50": 2.0,
+        "p95": 2.0269999999999997,
+        "mean": 2.004285714285714,
+        "stddev": 0.01718249385968444,
+        "min": 1.98,
+        "max": 2.03
+      },
+      "rss_peak_mb": {
+        "n": 7,
+        "median": 512.5,
+        "mad": 0.5,
+        "smad": 0.7413,
+        "p50": 512.5,
+        "p95": 513.85,
+        "mean": 512.5714285714286,
+        "stddev": 1.0177004891982149,
+        "min": 511.0,
+        "max": 514.0
+      }
+    },
+    "pmu": {
+      "cycles": 8000000000.0,
+      "instructions": 10000000000.0,
+      "ipc": 1.25,
+      "cache_miss_pct": 8.2
+    },
+    "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+  },
+  "fixes": [
+    {
+      "variant": "fix_R1",
+      "rule_id": "R1",
+      "verdict": "keep",
+      "reasons": [
+        "rss_peak_mb improved outside the noise band: \u0394median = -14 clears noise band \u00b13.14507 (k=3), direction=lower_better",
+        "wall_s improved outside the noise band: \u0394median = -1.3 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 498.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 498.5,
+            "p95": 499.85,
+            "mean": 498.57142857142856,
+            "stddev": 1.0177004891982149,
+            "min": 497.0,
+            "max": 500.0
+          },
+          "delta": -14.0,
+          "delta_pct": -2.731707317073171,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "\u0394median = -14 clears noise band \u00b13.14507 (k=3), direction=lower_better"
+        },
+        "wall_s": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 0.7,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 0.7,
+            "p95": 0.717,
+            "mean": 0.7028571428571428,
+            "stddev": 0.011126972805283745,
+            "min": 0.69,
+            "max": 0.72
+          },
+          "delta": -1.3,
+          "delta_pct": -65.0,
+          "band": 0.06290139082723058,
+          "band_k": 3.0,
+          "reason": "\u0394median = -1.3 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 4.1,
+          "delta": -4.1,
+          "delta_pct": -50.0
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 2900000000.0,
+          "delta": -5100000000.0,
+          "delta_pct": -63.74999999999999
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 6400000000.0,
+          "delta": -3600000000.0,
+          "delta_pct": -36.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 2.21,
+          "delta": 0.96,
+          "delta_pct": 76.8
+        }
+      },
+      "output_hash_equal": true,
+      "measurement": {
+        "variant": "fix_R1",
+        "instrument": "hyperfine",
+        "rule_id": "R1",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            0.71,
+            0.69,
+            0.72,
+            0.7,
+            0.7,
+            0.71,
+            0.69
+          ],
+          "rss_peak_mb": [
+            498.0,
+            500.0,
+            497.0,
+            499.0,
+            498.5,
+            499.5,
+            498.0
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 0.7,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 0.7,
+            "p95": 0.717,
+            "mean": 0.7028571428571428,
+            "stddev": 0.011126972805283745,
+            "min": 0.69,
+            "max": 0.72
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 498.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 498.5,
+            "p95": 499.85,
+            "mean": 498.57142857142856,
+            "stddev": 1.0177004891982149,
+            "min": 497.0,
+            "max": 500.0
+          }
+        },
+        "pmu": {
+          "cycles": 2900000000.0,
+          "instructions": 6400000000.0,
+          "ipc": 2.21,
+          "cache_miss_pct": 4.1
+        },
+        "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+      }
+    },
+    {
+      "variant": "fix_R3",
+      "rule_id": "R3",
+      "verdict": "keep",
+      "reasons": [
+        "wall_s improved outside the noise band: \u0394median = -0.7 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "no_change",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 512.0,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.0,
+            "p95": 513.0,
+            "mean": 512.2857142857143,
+            "stddev": 0.5669467095138409,
+            "min": 511.5,
+            "max": 513.0
+          },
+          "delta": -0.5,
+          "delta_pct": -0.0975609756097561,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "|\u0394median| = 0.5 inside noise band \u00b13.14507 (k=3) \u2014 refusing to claim a change"
+        },
+        "wall_s": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 1.3,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.3,
+            "p95": 1.317,
+            "mean": 1.302857142857143,
+            "stddev": 0.011126972805283745,
+            "min": 1.29,
+            "max": 1.32
+          },
+          "delta": -0.7,
+          "delta_pct": -35.0,
+          "band": 0.06290139082723058,
+          "band_k": 3.0,
+          "reason": "\u0394median = -0.7 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 6.0,
+          "delta": -2.1999999999999993,
+          "delta_pct": -26.829268292682922
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 5300000000.0,
+          "delta": -2700000000.0,
+          "delta_pct": -33.75
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 8900000000.0,
+          "delta": -1100000000.0,
+          "delta_pct": -11.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 1.68,
+          "delta": 0.42999999999999994,
+          "delta_pct": 34.4
+        }
+      },
+      "output_hash_equal": true,
+      "measurement": {
+        "variant": "fix_R3",
+        "instrument": "hyperfine",
+        "rule_id": "R3",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            1.31,
+            1.29,
+            1.32,
+            1.3,
+            1.3,
+            1.31,
+            1.29
+          ],
+          "rss_peak_mb": [
+            512.0,
+            513.0,
+            511.5,
+            512.5,
+            512.0,
+            513.0,
+            512.0
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 1.3,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.3,
+            "p95": 1.317,
+            "mean": 1.302857142857143,
+            "stddev": 0.011126972805283745,
+            "min": 1.29,
+            "max": 1.32
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 512.0,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.0,
+            "p95": 513.0,
+            "mean": 512.2857142857143,
+            "stddev": 0.5669467095138409,
+            "min": 511.5,
+            "max": 513.0
+          }
+        },
+        "pmu": {
+          "cycles": 5300000000.0,
+          "instructions": 8900000000.0,
+          "ipc": 1.68,
+          "cache_miss_pct": 6.0
+        },
+        "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+      }
+    },
+    {
+      "variant": "fix_R6",
+      "rule_id": "R6",
+      "verdict": "keep",
+      "reasons": [
+        "rss_peak_mb improved outside the noise band: \u0394median = -4 clears noise band \u00b13.14507 (k=3), direction=lower_better",
+        "wall_s improved outside the noise band: \u0394median = -0.45 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 508.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 508.5,
+            "p95": 509.7,
+            "mean": 508.5,
+            "stddev": 0.9574271077563381,
+            "min": 507.0,
+            "max": 510.0
+          },
+          "delta": -4.0,
+          "delta_pct": -0.7804878048780488,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "\u0394median = -4 clears noise band \u00b13.14507 (k=3), direction=lower_better"
+        },
+        "wall_s": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 1.55,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.55,
+            "p95": 1.567,
+            "mean": 1.552857142857143,
+            "stddev": 0.011126972805283745,
+            "min": 1.54,
+            "max": 1.57
+          },
+          "delta": -0.44999999999999996,
+          "delta_pct": -22.499999999999996,
+          "band": 0.06290139082723058,
+          "band_k": 3.0,
+          "reason": "\u0394median = -0.45 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 7.1,
+          "delta": -1.0999999999999996,
+          "delta_pct": -13.414634146341461
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 6200000000.0,
+          "delta": -1800000000.0,
+          "delta_pct": -22.5
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 9900000000.0,
+          "delta": -100000000.0,
+          "delta_pct": -1.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 1.6,
+          "delta": 0.3500000000000001,
+          "delta_pct": 28.000000000000007
+        }
+      },
+      "output_hash_equal": true,
+      "measurement": {
+        "variant": "fix_R6",
+        "instrument": "hyperfine",
+        "rule_id": "R6",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            1.56,
+            1.54,
+            1.57,
+            1.55,
+            1.55,
+            1.56,
+            1.54
+          ],
+          "rss_peak_mb": [
+            508.0,
+            510.0,
+            507.0,
+            509.0,
+            508.5,
+            509.0,
+            508.0
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 1.55,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.55,
+            "p95": 1.567,
+            "mean": 1.552857142857143,
+            "stddev": 0.011126972805283745,
+            "min": 1.54,
+            "max": 1.57
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 508.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 508.5,
+            "p95": 509.7,
+            "mean": 508.5,
+            "stddev": 0.9574271077563381,
+            "min": 507.0,
+            "max": 510.0
+          }
+        },
+        "pmu": {
+          "cycles": 6200000000.0,
+          "instructions": 9900000000.0,
+          "ipc": 1.6,
+          "cache_miss_pct": 7.1
+        },
+        "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+      }
+    },
+    {
+      "variant": "fix_R4",
+      "rule_id": "R4",
+      "verdict": "keep",
+      "reasons": [
+        "rss_peak_mb improved outside the noise band: \u0394median = -200 clears noise band \u00b13.14507 (k=3), direction=lower_better",
+        "wall_s improved outside the noise band: \u0394median = -0.28 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 312.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 312.5,
+            "p95": 313.7,
+            "mean": 312.5,
+            "stddev": 0.9574271077563381,
+            "min": 311.0,
+            "max": 314.0
+          },
+          "delta": -200.0,
+          "delta_pct": -39.02439024390244,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "\u0394median = -200 clears noise band \u00b13.14507 (k=3), direction=lower_better"
+        },
+        "wall_s": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 1.72,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.72,
+            "p95": 1.7369999999999999,
+            "mean": 1.717142857142857,
+            "stddev": 0.014960264830861924,
+            "min": 1.7,
+            "max": 1.74
+          },
+          "delta": -0.28,
+          "delta_pct": -14.000000000000002,
+          "band": 0.06290139082723058,
+          "band_k": 3.0,
+          "reason": "\u0394median = -0.28 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 5.4,
+          "delta": -2.799999999999999,
+          "delta_pct": -34.14634146341463
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 6900000000.0,
+          "delta": -1100000000.0,
+          "delta_pct": -13.750000000000002
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 9400000000.0,
+          "delta": -600000000.0,
+          "delta_pct": -6.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 1.36,
+          "delta": 0.1100000000000001,
+          "delta_pct": 8.800000000000008
+        }
+      },
+      "output_hash_equal": true,
+      "measurement": {
+        "variant": "fix_R4",
+        "instrument": "hyperfine",
+        "rule_id": "R4",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            1.72,
+            1.7,
+            1.74,
+            1.71,
+            1.72,
+            1.73,
+            1.7
+          ],
+          "rss_peak_mb": [
+            312.0,
+            314.0,
+            311.0,
+            313.0,
+            312.0,
+            312.5,
+            313.0
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 1.72,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.72,
+            "p95": 1.7369999999999999,
+            "mean": 1.717142857142857,
+            "stddev": 0.014960264830861924,
+            "min": 1.7,
+            "max": 1.74
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 312.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 312.5,
+            "p95": 313.7,
+            "mean": 312.5,
+            "stddev": 0.9574271077563381,
+            "min": 311.0,
+            "max": 314.0
+          }
+        },
+        "pmu": {
+          "cycles": 6900000000.0,
+          "instructions": 9400000000.0,
+          "ipc": 1.36,
+          "cache_miss_pct": 5.4
+        },
+        "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+      }
+    },
+    {
+      "variant": "fix_R8",
+      "rule_id": "R8",
+      "verdict": "drop",
+      "reasons": [
+        "output hash mismatch: baseline a3f5a3f5a3f5\u2026 != candidate b4e6b4e6b4e6\u2026 \u2014 fix changes behavior"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 505.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 505.5,
+            "p95": 506.7,
+            "mean": 505.5,
+            "stddev": 0.9574271077563381,
+            "min": 504.0,
+            "max": 507.0
+          },
+          "delta": -7.0,
+          "delta_pct": -1.3658536585365855,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "\u0394median = -7 clears noise band \u00b13.14507 (k=3), direction=lower_better"
+        },
+        "wall_s": {
+          "verdict": "improved",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 1.61,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.61,
+            "p95": 1.627,
+            "mean": 1.612857142857143,
+            "stddev": 0.011126972805283688,
+            "min": 1.6,
+            "max": 1.63
+          },
+          "delta": -0.3899999999999999,
+          "delta_pct": -19.499999999999996,
+          "band": 0.06290139082723058,
+          "band_k": 3.0,
+          "reason": "\u0394median = -0.39 clears noise band \u00b10.0629014 (k=3), direction=lower_better"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 6.6,
+          "delta": -1.5999999999999996,
+          "delta_pct": -19.51219512195122
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 6500000000.0,
+          "delta": -1500000000.0,
+          "delta_pct": -18.75
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 9600000000.0,
+          "delta": -400000000.0,
+          "delta_pct": -4.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 1.48,
+          "delta": 0.22999999999999998,
+          "delta_pct": 18.4
+        }
+      },
+      "output_hash_equal": false,
+      "measurement": {
+        "variant": "fix_R8",
+        "instrument": "hyperfine",
+        "rule_id": "R8",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            1.62,
+            1.6,
+            1.63,
+            1.61,
+            1.61,
+            1.62,
+            1.6
+          ],
+          "rss_peak_mb": [
+            505.0,
+            507.0,
+            504.0,
+            506.0,
+            505.5,
+            506.0,
+            505.0
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 1.61,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 1.61,
+            "p95": 1.627,
+            "mean": 1.612857142857143,
+            "stddev": 0.011126972805283688,
+            "min": 1.6,
+            "max": 1.63
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 505.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 505.5,
+            "p95": 506.7,
+            "mean": 505.5,
+            "stddev": 0.9574271077563381,
+            "min": 504.0,
+            "max": 507.0
+          }
+        },
+        "pmu": {
+          "cycles": 6500000000.0,
+          "instructions": 9600000000.0,
+          "ipc": 1.48,
+          "cache_miss_pct": 6.6
+        },
+        "output_sha256": "b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6b4e6"
+      }
+    },
+    {
+      "variant": "fix_R11",
+      "rule_id": "R11",
+      "verdict": "drop",
+      "reasons": [
+        "no primary metric improved outside the noise band \u2014 in-band deltas are reported as 'no change' (checked: ['rss_peak_mb', 'wall_s'])"
+      ],
+      "comparisons": {
+        "rss_peak_mb": {
+          "verdict": "no_change",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 512.5,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.5,
+            "p95": 513.85,
+            "mean": 512.5714285714286,
+            "stddev": 1.0177004891982149,
+            "min": 511.0,
+            "max": 514.0
+          },
+          "candidate": {
+            "n": 7,
+            "median": 512.0,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.0,
+            "p95": 512.85,
+            "mean": 511.7857142857143,
+            "stddev": 0.8591246929842246,
+            "min": 510.5,
+            "max": 513.0
+          },
+          "delta": -0.5,
+          "delta_pct": -0.0975609756097561,
+          "band": 3.1450695413615257,
+          "band_k": 3.0,
+          "reason": "|\u0394median| = 0.5 inside noise band \u00b13.14507 (k=3) \u2014 refusing to claim a change"
+        },
+        "wall_s": {
+          "verdict": "no_change",
+          "direction": "lower_better",
+          "baseline": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.010000000000000009,
+            "smad": 0.014826000000000013,
+            "p50": 2.0,
+            "p95": 2.0269999999999997,
+            "mean": 2.004285714285714,
+            "stddev": 0.01718249385968444,
+            "min": 1.98,
+            "max": 2.03
+          },
+          "candidate": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.009999999999999787,
+            "smad": 0.014825999999999683,
+            "p50": 2.0,
+            "p95": 2.017,
+            "mean": 1.997142857142857,
+            "stddev": 0.01704336206492692,
+            "min": 1.97,
+            "max": 2.02
+          },
+          "delta": 0.0,
+          "delta_pct": 0.0,
+          "band": 0.06290139082722988,
+          "band_k": 3.0,
+          "reason": "|\u0394median| = 0 inside noise band \u00b10.0629014 (k=3) \u2014 refusing to claim a change"
+        }
+      },
+      "pmu_delta": {
+        "cache_miss_pct": {
+          "before": 8.2,
+          "after": 8.0,
+          "delta": -0.1999999999999993,
+          "delta_pct": -2.439024390243894
+        },
+        "cycles": {
+          "before": 8000000000.0,
+          "after": 7900000000.0,
+          "delta": -100000000.0,
+          "delta_pct": -1.25
+        },
+        "instructions": {
+          "before": 10000000000.0,
+          "after": 10000000000.0,
+          "delta": 0.0,
+          "delta_pct": 0.0
+        },
+        "ipc": {
+          "before": 1.25,
+          "after": 1.27,
+          "delta": 0.020000000000000018,
+          "delta_pct": 1.6000000000000014
+        }
+      },
+      "output_hash_equal": true,
+      "measurement": {
+        "variant": "fix_R11",
+        "instrument": "hyperfine",
+        "rule_id": "R11",
+        "synthetic": true,
+        "samples": {
+          "wall_s": [
+            2.0,
+            1.97,
+            2.02,
+            2.0,
+            1.98,
+            2.01,
+            2.0
+          ],
+          "rss_peak_mb": [
+            511.0,
+            513.0,
+            510.5,
+            512.0,
+            511.5,
+            512.0,
+            512.5
+          ]
+        },
+        "metrics_summary": {
+          "wall_s": {
+            "n": 7,
+            "median": 2.0,
+            "mad": 0.009999999999999787,
+            "smad": 0.014825999999999683,
+            "p50": 2.0,
+            "p95": 2.017,
+            "mean": 1.997142857142857,
+            "stddev": 0.01704336206492692,
+            "min": 1.97,
+            "max": 2.02
+          },
+          "rss_peak_mb": {
+            "n": 7,
+            "median": 512.0,
+            "mad": 0.5,
+            "smad": 0.7413,
+            "p50": 512.0,
+            "p95": 512.85,
+            "mean": 511.7857142857143,
+            "stddev": 0.8591246929842246,
+            "min": 510.5,
+            "max": 513.0
+          }
+        },
+        "pmu": {
+          "cycles": 7900000000.0,
+          "instructions": 10000000000.0,
+          "ipc": 1.27,
+          "cache_miss_pct": 8.0
+        },
+        "output_sha256": "a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5a3f5"
+      }
+    }
+  ],
+  "artifacts": {
+    "flamegraph_before": null,
+    "flamegraph_after": null,
+    "performix_ref": null
+  },
+  "cost": {
+    "cost_usd": 0.0,
+    "note": "replay mode \u2014 no hardware spend"
+  },
+  "signature": {
+    "algorithm": "ed25519",
+    "report_sha256": "bb8674a29d8cee84f5d2f7b59da6a54191d17cc2e9e22238c4b81dd6c5f376af",
+    "signature_b64": "w58g4Uppo4Fwrz5FYZeDVzWDM4WKTsPc51RYAFmngpW0JNwGVyqQfwE6mJzAPSQQbd09gWGRT1LJMBrMgJ2MBA==",
+    "public_key_b64": "Ldn1Wl4SVf/dSd+lO3pNIZAwJRH948W6Eq/+wFoQ51E="
+  }
+}

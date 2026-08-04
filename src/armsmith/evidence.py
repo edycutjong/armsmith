@@ -107,6 +107,8 @@ def _finding_lines(findings: list[dict], specs_by_id: dict[str, Any] | None) -> 
             spec = specs_by_id[rid]
             title = f" — {spec.title}"
             cite = f" ([source]({spec.citation_url}))"
+            if getattr(spec, "learning_path", None):
+                cite += f" · [Arm Learning Path]({spec.learning_path})"
         lines.append(f"- {icon} **{rid}**{title}: {status}{cite}")
         if status == "matched":
             for ev in (f.get("evidence") or [])[:3]:

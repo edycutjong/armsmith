@@ -92,10 +92,10 @@ check_untyped_defs = true
 disable_error_code = ["import-untyped"]
 
 # ── Coverage (pytest-cov) ─────────────────────────────────────────────────────
-# Line coverage over the installed package (currently ~94%). Branch coverage is
+# Line coverage over the installed package (currently ~93%). Branch coverage is
 # intentionally OFF so the reported figure is the line-coverage number quoted in
 # the README/deck. `exclude_lines` drops only standard defensive markers — it does
-# NOT paper over the real uncovered branches in r12/r13/report that the honest 94%
+# NOT paper over the real uncovered branches in r12/r13/report that the honest 93%
 # reflects. No `fail_under` gate: coverage is a signal here, like mypy.
 [tool.coverage.run]
 source = ["armsmith"]
