@@ -16,6 +16,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Security gate: verified-secret scan across full git history ──────
+  secret-scan:
+    name: "Secret scanning (TruffleHog)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so rotated/committed secrets are caught
+      - name: TruffleHog verified-secret scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+
   test:
     strategy:
       fail-fast: false
@@ -37,10 +50,12 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (208 tests) with coverage
+      - name: Unit + replay suite (219 tests) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
+      - name: Reproduce-gate CI twin (armsmith ci — the drop-in Arm perf gate)
+        run: .venv/bin/armsmith ci --replay fixtures/replays/scenario_ragserve
       - name: Report schema is valid JSON Schema
         run: .venv/bin/python -c "import json, jsonschema; jsonschema.Draft202012Validator.check_schema(json.load(open('schema/report.schema.json')))"
       - name: Dependency audit (pip-audit — advisory)

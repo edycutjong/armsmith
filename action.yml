@@ -1,0 +1,39 @@
+# Armsmith — drop-in Arm performance-regression gate.
+#
+# Composite action: installs armsmith and runs the reproduce gate against a
+# replay bundle, failing the job (non-zero exit) if any candidate regresses
+# outside its noise band. Intended for `runs-on: ubuntu-24.04-arm` (free native
+# arm64 hosted runner) so the gate executes on the target ISA.
+#
+#   - uses: edycu/armsmith@v1
+#     with:
+#       replay: fixtures/replays/scenario_ragserve
+#
+# Live-target mode (armsmith diagnose <repo> --target ssh://…) is TODO(S1);
+# this action gates on a recorded/replay bundle today and never fabricates a
+# hardware measurement. The formal Marketplace listing is publish-pending.
+name: "Armsmith Arm performance gate"
+description: "Fail CI on an Arm performance regression, proven by the reproduce gate (median-of-N · MAD noise band · output-hash equality)."
+branding:
+  icon: "cpu"
+  color: "orange"
+inputs:
+  replay:
+    description: "Path to the replay bundle to gate (recorded probes + bench records)."
+    required: true
+  python-version:
+    description: "Python version to install armsmith under."
+    required: false
+    default: "3.12"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install armsmith
+      shell: bash
+      run: python -m pip install -e "${{ github.action_path }}"
+    - name: Run the Arm reproduce gate
+      shell: bash
+      run: armsmith ci --replay "${{ inputs.replay }}"
