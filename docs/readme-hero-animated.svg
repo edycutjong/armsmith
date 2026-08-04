@@ -1,0 +1,298 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img"
+     aria-label="Armsmith — diagnoses slow AI repos on Arm and opens the fix PR. Animated diagram: findings fly from a repo into the reproduce gate; proven fixes reach the pull request, unproven ones are dropped with reasons.">
+  <style>
+    .story { animation: storyFade 8s linear infinite; }
+    @keyframes storyFade {
+      0% { opacity: 0; }
+      2% { opacity: 1; }
+      96% { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .metric { animation: metricPulse 8s ease-in-out infinite; }
+    @keyframes metricPulse {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0.55; }
+    }
+    .beam { animation: beamSweep 8s linear infinite; opacity: 0; }
+    @keyframes beamSweep {
+      0%, 30% { transform: translateX(0) skewX(-16deg); opacity: 0; }
+      34% { opacity: 0.5; }
+      48% { opacity: 0.5; }
+      52% { transform: translateX(1560px) skewX(-16deg); opacity: 0; }
+      100% { transform: translateX(1560px) skewX(-16deg); opacity: 0; }
+    }
+    .blobA { animation: blobDriftA 16s ease-in-out infinite alternate; }
+    .blobB { animation: blobDriftB 19s ease-in-out infinite alternate; }
+    @keyframes blobDriftA { from { transform: translate(0px, 0px); } to { transform: translate(70px, 26px); } }
+    @keyframes blobDriftB { from { transform: translate(0px, 0px); } to { transform: translate(-80px, -24px); } }
+    .shimmer { animation: shimmerSweep 8s ease-in-out infinite; }
+    @keyframes shimmerSweep {
+      0%, 62% { transform: translateX(-10px); }
+      74%, 100% { transform: translateX(300px); }
+    }
+    .miniDot { animation: miniPulse 8s ease-in-out infinite; }
+    @keyframes miniPulse {
+      0%, 50%, 100% { opacity: 1; }
+      25%, 75% { opacity: 0.45; }
+    }
+    .prCard {
+      transform-box: fill-box; transform-origin: center;
+      animation: prPop 8s cubic-bezier(.2, 1.4, .4, 1) infinite;
+    }
+    @keyframes prPop {
+      0%, 56% { transform: scale(0.92); }
+      61% { transform: scale(1.04); }
+      65%, 100% { transform: scale(1); }
+    }
+    .seal {
+      transform-box: fill-box; transform-origin: center;
+      animation: sealPop 8s cubic-bezier(.2, 1.4, .4, 1) infinite;
+    }
+    @keyframes sealPop {
+      0%, 78% { transform: scale(0) rotate(-14deg); }
+      82% { transform: scale(1.15) rotate(-4deg); }
+      85%, 100% { transform: scale(1) rotate(-6deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+    }
+  </style>
+  <defs>
+    <clipPath id="plateClip"><rect x="8" y="8" width="1264" height="304" rx="24"/></clipPath>
+    <pattern id="gridP" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48,0 L0,0 L0,48" fill="none" stroke="rgba(236,246,241,0.045)" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="traceG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A9FFDF"/>
+      <stop offset="45%" stop-color="#2EE6A6"/>
+      <stop offset="100%" stop-color="#1EC488"/>
+    </linearGradient>
+    <linearGradient id="wordG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#C9FFE9"/>
+      <stop offset="55%" stop-color="#2EE6A6"/>
+      <stop offset="100%" stop-color="#1CBE87"/>
+    </linearGradient>
+    <linearGradient id="wireG" gradientUnits="userSpaceOnUse" x1="766" y1="140" x2="912" y2="140">
+      <stop offset="0%" stop-color="#2EE6A6" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#2EE6A6" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="beamG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="scanG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#2EE6A6" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#2EE6A6" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#2EE6A6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="fAurora" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="42"/>
+    </filter>
+    <filter id="fSoft" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="fGlowLine" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="clipMedic">
+      <g transform="translate(251.1, 99)">
+        <path d="M12.4 0L4.2 0L4.2-44.8L19.9-44.8L27.6-5.8L28.8-5.8L36.5-44.8L52.2-44.8L52.2 0L44 0L44-38.6L42.9-38.6L35.2 0L21.2 0L13.6-38.6L12.4-38.6L12.4 0M75.4 0.9Q70.7 0.9 67-1.1Q63.4-3.1 61.4-6.8Q59.4-10.5 59.4-15.5L59.4-16.3Q59.4-21.2 61.4-24.9Q63.4-28.6 66.9-30.6Q70.5-32.6 75.3-32.6Q79.9-32.6 83.4-30.6Q86.8-28.5 88.8-24.8Q90.7-21.1 90.7-16.3L90.7-13.5L67.6-13.5Q67.7-10.2 70-8.2Q72.3-6.1 75.6-6.1Q79-6.1 80.6-7.6Q82.2-9.1 83.1-10.9L89.7-7.4Q88.8-5.8 87.1-3.8Q85.4-1.9 82.6-0.5Q79.7 0.9 75.4 0.9M67.6-19.5L82.5-19.5Q82.2-22.3 80.3-23.9Q78.3-25.6 75.2-25.6Q71.9-25.6 70-23.9Q68.1-22.3 67.6-19.5M110.7 0.9Q106.9 0.9 103.6-1Q100.3-2.9 98.3-6.5Q96.3-10.2 96.3-15.4L96.3-16.4Q96.3-21.6 98.3-25.2Q100.3-28.9 103.6-30.8Q106.8-32.6 110.7-32.6Q113.5-32.6 115.5-32Q117.4-31.3 118.7-30.3Q119.9-29.2 120.5-28.1L121.7-28.1L121.7-44.8L129.7-44.8L129.7 0L121.8 0L121.8-3.8L120.6-3.8Q119.6-2 117.3-0.6Q115 0.9 110.7 0.9M113.1-6.1Q116.8-6.1 119.3-8.5Q121.8-10.9 121.8-15.6L121.8-16.2Q121.8-20.8 119.3-23.2Q116.9-25.6 113.1-25.6Q109.4-25.6 106.9-23.2Q104.4-20.8 104.4-16.2L104.4-15.6Q104.4-10.9 106.9-8.5Q109.4-6.1 113.1-6.1M146.8 0L138.7 0L138.7-31.7L146.8-31.7L146.8 0M142.7-35.5Q140.5-35.5 139-36.9Q137.5-38.3 137.5-40.6Q137.5-42.9 139-44.3Q140.5-45.7 142.7-45.7Q145-45.7 146.4-44.3Q147.9-42.9 147.9-40.6Q147.9-38.3 146.4-36.9Q145-35.5 142.7-35.5M170.6 0.9Q166 0.9 162.3-1Q158.5-2.9 156.4-6.6Q154.2-10.2 154.2-15.4L154.2-16.3Q154.2-21.5 156.4-25.2Q158.5-28.8 162.3-30.7Q166-32.6 170.6-32.6Q175.2-32.6 178.4-31Q181.7-29.4 183.7-26.7Q185.7-23.9 186.4-20.4L178.6-18.7Q178.3-20.6 177.4-22.1Q176.5-23.7 174.9-24.6Q173.2-25.5 170.8-25.5Q168.4-25.5 166.4-24.4Q164.5-23.4 163.4-21.3Q162.2-19.2 162.2-16.2L162.2-15.6Q162.2-12.5 163.4-10.5Q164.5-8.4 166.4-7.3Q168.4-6.3 170.8-6.3Q174.5-6.3 176.4-8.2Q178.2-10 178.8-13.1L186.6-11.3Q185.7-7.9 183.7-5.1Q181.7-2.3 178.4-0.7Q175.2 0.9 170.6 0.9"/>
+      </g>
+    </clipPath>
+  </defs>
+
+  <!-- ===== Backdrop ===== -->
+  <rect x="8" y="8" width="1264" height="304" rx="24" fill="#070E13"/>
+  <g clip-path="url(#plateClip)">
+    <rect x="8" y="8" width="1264" height="304" fill="url(#gridP)"/>
+    <circle class="blobA" cx="250" cy="26" r="140" fill="#2EE6A6" opacity="0.13" filter="url(#fAurora)"/>
+    <circle class="blobB" cx="1080" cy="296" r="150" fill="#FF8A3D" opacity="0.10" filter="url(#fAurora)"/>
+    <g class="beam"><rect x="-180" y="8" width="130" height="304" fill="url(#beamG)"/></g>
+  </g>
+  <rect x="8.75" y="8.75" width="1262.5" height="302.5" rx="23.25" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5"/>
+
+  <!-- ===== Left: brand block (persistent) ===== -->
+  <!-- Mini mark -->
+  <g transform="translate(44, 46)">
+    <rect x="17" y="17" width="30" height="30" rx="7" fill="rgba(46,230,166,0.05)" stroke="rgba(236,246,241,0.3)" stroke-width="1.6"/>
+    <path d="M11,34 L24,34 L26.5,37.5 L30.5,15.5 L34.5,42.5 L37.75,34 L42,34 L44,31 L46,34 L53,34"
+          fill="none" stroke="url(#traceG)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle class="miniDot" cx="30.5" cy="15.5" r="2.6" fill="#FF8A3D"/>
+  </g>
+
+  <!-- Wordmark: Arm (near-white) + smith (gradient) — live text, editable -->
+  <text x="118" y="99" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-weight="700" font-size="62" letter-spacing="-1"><tspan fill="#ECF6F1">Arm</tspan><tspan fill="url(#wordG)">smith</tspan></text>
+
+  <!-- Tagline (system sans) -->
+  <text x="44" y="145" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="16" fill="#8FA79D">Diagnoses slow AI repos on Arm —</text>
+  <text x="44" y="169" font-family="'Segoe UI', system-ui, -apple-system, sans-serif" font-size="16" fill="#8FA79D">then <tspan fill="#ECF6F1">opens the pull request</tspan> with the fix.</text>
+
+  <!-- Hero metric (mono, pulsing) -->
+  <text class="metric" x="44" y="210" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14.5" fill="#2EE6A6">▲ 6 fixes → 4 proven · 2 dropped · hash-equal</text>
+
+  <!-- Tech line (mono, faint) -->
+  <text x="44" y="240" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#5C7268">arm64 · perf/PMU · llama-bench · KleidiAI · ed25519</text>
+
+  <!-- ===== Right: product story (loop-fading layer) ===== -->
+  <g class="story">
+
+    <!-- Wires -->
+    <path d="M766,140 L912,140" pathLength="100" fill="none" stroke="url(#wireG)" stroke-width="2.5"
+          stroke-dasharray="100" stroke-dashoffset="100">
+      <animate attributeName="stroke-dashoffset" dur="8s" repeatCount="indefinite"
+               values="100;100;0;0" keyTimes="0;0.06;0.16;1"/>
+    </path>
+    <path d="M948,140 C990,140 1010,141 1030,142" pathLength="100" fill="none" stroke="#2EE6A6" stroke-opacity="0.55" stroke-width="2.5"
+          stroke-dasharray="100" stroke-dashoffset="100">
+      <animate attributeName="stroke-dashoffset" dur="8s" repeatCount="indefinite"
+               values="100;100;0;0" keyTimes="0;0.16;0.24;1"/>
+    </path>
+
+    <!-- Repo card -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1" keyTimes="0;0.02;0.08;1"/>
+      <rect x="620" y="92" width="140" height="100" rx="10" fill="rgba(9,18,24,0.88)" stroke="rgba(255,255,255,0.14)" stroke-width="1.2"/>
+      <text x="634" y="117" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12.5" fill="#ECF6F1">ragserve/</text>
+      <text x="634" y="142" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#5C7268">Dockerfile</text>
+      <text x="634" y="160" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#5C7268">model.Q4_0.gguf</text>
+      <text x="634" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10" fill="#5C7268">.github/workflows/</text>
+      <!-- Scan beam sweeps the repo -->
+      <rect x="624" y="98" width="132" height="3" rx="1.5" fill="url(#scanG)" opacity="0">
+        <animate attributeName="y" dur="8s" repeatCount="indefinite"
+                 values="98;98;178;98" keyTimes="0;0.08;0.17;1"/>
+        <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+                 values="0;0;0.9;0.9;0;0" keyTimes="0;0.08;0.10;0.15;0.18;1"/>
+      </rect>
+    </g>
+
+    <!-- Rule chips pop under the repo -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.18;0.21;1"/>
+      <rect x="620" y="200" width="40" height="19" rx="5" fill="rgba(46,230,166,0.08)" stroke="rgba(46,230,166,0.35)" stroke-width="1"/>
+      <text x="640" y="213.5" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9.5" fill="#2EE6A6">R2</text>
+    </g>
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.21;0.24;1"/>
+      <rect x="668" y="200" width="40" height="19" rx="5" fill="rgba(46,230,166,0.08)" stroke="rgba(46,230,166,0.35)" stroke-width="1"/>
+      <text x="688" y="213.5" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9.5" fill="#2EE6A6">R5</text>
+    </g>
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.24;0.27;1"/>
+      <rect x="716" y="200" width="44" height="19" rx="5" fill="rgba(46,230,166,0.08)" stroke="rgba(46,230,166,0.35)" stroke-width="1"/>
+      <text x="738" y="213.5" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9.5" fill="#2EE6A6">R10</text>
+    </g>
+
+    <!-- Gate -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.04;0.10;1"/>
+      <rect x="906" y="88" width="38" height="104" rx="10" fill="rgba(9,20,24,0.9)" stroke="rgba(236,246,241,0.25)" stroke-width="1.4"/>
+      <rect x="922.75" y="98" width="4.5" height="84" rx="2.25" fill="#2EE6A6" filter="url(#fGlowLine)" opacity="0.75">
+        <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+                 values="0.75;0.75;1;0.75;1;0.75;1;0.75;1;0.75;0.75"
+                 keyTimes="0;0.36;0.38;0.42;0.44;0.46;0.48;0.52;0.54;0.58;1"/>
+      </rect>
+      <text x="925" y="218" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5" letter-spacing="1.5" fill="#2EE6A6">REPRODUCE GATE</text>
+      <text x="925" y="236" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="9.5" fill="#8FA79D">median-of-7 · MAD k=3 · hash =</text>
+    </g>
+
+    <!-- Comet 1: passes the gate, reaches the PR -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.28;0.30;0.36;0.38;1"/>
+      <circle r="5" fill="#C9FFE8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.28;0.38;1" path="M766,140 L916,140"/>
+    </g>
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.38;0.395;0.445;0.46;1"/>
+      <circle r="5" fill="#C9FFE8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.38;0.46;1" path="M934,140 C980,140 1005,141 1030,142"/>
+    </g>
+
+    <!-- Comet 2: passes the gate, reaches the PR -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.34;0.36;0.42;0.44;1"/>
+      <circle r="5" fill="#C9FFE8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.34;0.44;1" path="M766,140 L916,140"/>
+    </g>
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.44;0.455;0.505;0.52;1"/>
+      <circle r="5" fill="#C9FFE8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.44;0.52;1" path="M934,140 C980,140 1005,141 1030,142"/>
+    </g>
+
+    <!-- Comet 3: dies at the gate (noise band) -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.40;0.42;0.47;0.485;1"/>
+      <circle r="5" fill="#FFD9B8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.40;0.48;1" path="M766,140 L910,140"/>
+    </g>
+    <!-- Comet 4: dies at the gate (hash mismatch) -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.46;0.48;0.53;0.545;1"/>
+      <circle r="5" fill="#FFD9B8" filter="url(#fSoft)"/>
+      <circle r="2.2" fill="#FFFFFF"/>
+      <animateMotion dur="8s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.46;0.54;1" path="M766,140 L910,140"/>
+    </g>
+
+    <!-- Rejection X marks at the gate mouth -->
+    <g stroke="#FF8A3D" stroke-width="2.4" stroke-linecap="round" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;0.75;0.75" keyTimes="0;0.48;0.50;0.56;1"/>
+      <line x1="891" y1="119" x2="901" y2="129"/>
+      <line x1="901" y1="119" x2="891" y2="129"/>
+    </g>
+    <g stroke="#FF8A3D" stroke-width="2.4" stroke-linecap="round" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;0.75;0.75" keyTimes="0;0.54;0.56;0.62;1"/>
+      <line x1="891" y1="151" x2="901" y2="161"/>
+      <line x1="901" y1="151" x2="891" y2="161"/>
+    </g>
+
+    <!-- Drop ledger -->
+    <text x="620" y="245" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5" fill="#FF8A3D" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.50;0.53;1"/>✕ R6 · inside noise band — dropped</text>
+    <text x="620" y="263" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5" fill="#FF8A3D" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.56;0.59;1"/>✕ R9 · output-hash mismatch — dropped</text>
+
+    <!-- PR card -->
+    <g class="prCard" opacity="0">
+      <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.56;0.62;1"/>
+      <rect x="1030" y="84" width="196" height="120" rx="12" fill="rgba(9,18,24,0.9)" stroke="rgba(46,230,166,0.35)" stroke-width="1.3"/>
+      <line x1="1030" y1="112" x2="1226" y2="112" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+      <circle cx="1046" cy="98" r="5" fill="none" stroke="#2EE6A6" stroke-width="2"/>
+      <text x="1058" y="102" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" fill="#ECF6F1">PR · perf: arm64 fixes</text>
+      <text x="1044" y="134" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#8FA79D" opacity="0">
+        <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.63;0.66;1"/>+ before/after table</text>
+      <text x="1044" y="154" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#8FA79D" opacity="0">
+        <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.68;0.71;1"/>+ PMU Δ · flamegraph</text>
+      <text x="1044" y="174" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#8FA79D" opacity="0">
+        <animate attributeName="opacity" dur="8s" repeatCount="indefinite" values="0;0;1;1" keyTimes="0;0.73;0.76;1"/>+ signed · ed25519</text>
+    </g>
+
+    <!-- Verdict seal -->
+    <g class="seal">
+      <g transform="translate(1150, 196)">
+        <rect x="-60" y="-13" width="120" height="26" rx="13" fill="rgba(46,230,166,0.14)" stroke="#2EE6A6" stroke-opacity="0.75" stroke-width="1.4"/>
+        <text x="0" y="4" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="10.5" font-weight="600" letter-spacing="0.6" fill="#2EE6A6">4 KEPT · 2 DROP</text>
+      </g>
+    </g>
+  </g>
+</svg>
