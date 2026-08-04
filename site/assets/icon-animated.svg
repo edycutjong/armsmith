@@ -1,0 +1,136 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img"
+     aria-label="Armsmith animated icon: a vitals trace draws itself across an Arm chip, a hotspot peak lands with an amber ripple, then the trace breathes with a green glow">
+  <style>
+    .pins {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: pinpop 6s cubic-bezier(.2, 1.4, .4, 1) infinite;
+    }
+    @keyframes pinpop {
+      0%, 20% { transform: scale(0.92); }
+      27% { transform: scale(1.05); }
+      33%, 100% { transform: scale(1); }
+    }
+    .peak {
+      transform-box: fill-box;
+      transform-origin: center;
+      animation: peakpop 6s cubic-bezier(.2, 1.4, .4, 1) infinite;
+    }
+    @keyframes peakpop {
+      0%, 52% { transform: scale(0); }
+      56% { transform: scale(1.35); }
+      60%, 100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; }
+    }
+  </style>
+  <defs>
+    <linearGradient id="plateG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1820"/>
+      <stop offset="100%" stop-color="#060D12"/>
+    </linearGradient>
+    <radialGradient id="washG" cx="0.24" cy="0.16" r="0.9">
+      <stop offset="0%" stop-color="#2EE6A6" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#2EE6A6" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#2EE6A6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="traceG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A9FFDF"/>
+      <stop offset="45%" stop-color="#2EE6A6"/>
+      <stop offset="100%" stop-color="#1EC488"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="breathBlur" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+  </defs>
+
+  <!-- Static plate (persists across the loop) -->
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#plateG)"/>
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#washG)"/>
+  <rect x="34" y="34" width="444" height="444" rx="114" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="3"/>
+
+  <!-- Story layer: fades 96–100% out and 0–2% in so the restart never hard-cuts -->
+  <g>
+    <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+             values="0;1;1;0" keyTimes="0;0.02;0.96;1"/>
+
+    <!-- Chip body draws itself in -->
+    <rect x="136" y="136" width="240" height="240" rx="48" pathLength="100"
+          fill="rgba(46,230,166,0.045)" stroke="rgba(236,246,241,0.28)" stroke-width="12"
+          stroke-dasharray="100" stroke-dashoffset="100">
+      <animate attributeName="stroke-dashoffset" dur="6s" repeatCount="indefinite"
+               values="100;100;0;0" keyTimes="0;0.05;0.22;1"/>
+    </rect>
+
+    <!-- Pins pop in -->
+    <g class="pins" stroke="rgba(236,246,241,0.22)" stroke-width="16" stroke-linecap="round" opacity="0">
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+               values="0;0;1;1" keyTimes="0;0.20;0.27;1"/>
+      <line x1="176" y1="108" x2="176" y2="132"/>
+      <line x1="336" y1="108" x2="336" y2="132"/>
+      <line x1="176" y1="380" x2="176" y2="404"/>
+      <line x1="336" y1="380" x2="336" y2="404"/>
+      <line x1="108" y1="176" x2="132" y2="176"/>
+      <line x1="108" y1="336" x2="132" y2="336"/>
+      <line x1="380" y1="176" x2="404" y2="176"/>
+      <line x1="380" y1="336" x2="404" y2="336"/>
+    </g>
+
+    <!-- Glow breath: blurred duplicate of the trace, breathing after the draw -->
+    <path d="M88,272 L192,272 L212,300 L244,124 L276,340 L302,272 L336,272 L352,250 L368,272 L424,272"
+          fill="none" stroke="#2EE6A6" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"
+          filter="url(#breathBlur)" opacity="0">
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+               values="0;0;0.75;0.25;0.6;0.6" keyTimes="0;0.58;0.72;0.84;0.94;1"/>
+    </path>
+
+    <!-- Vitals trace draws left to right -->
+    <path d="M88,272 L192,272 L212,300 L244,124 L276,340 L302,272 L336,272 L352,250 L368,272 L424,272"
+          pathLength="100" fill="none" stroke="url(#traceG)" stroke-width="24"
+          stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"
+          stroke-dasharray="100" stroke-dashoffset="100">
+      <animate attributeName="stroke-dashoffset" dur="6s" repeatCount="indefinite"
+               values="100;100;0;0" keyTimes="0;0.30;0.56;1"/>
+    </path>
+
+    <!-- Beat dot travels the trace while it draws -->
+    <g opacity="0">
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+               values="0;0;1;1;0;0" keyTimes="0;0.30;0.32;0.54;0.58;1"/>
+      <circle r="13" fill="#D9FFEF" filter="url(#glow)"/>
+      <animateMotion dur="6s" repeatCount="indefinite" calcMode="linear"
+                     keyPoints="0;0;1;1" keyTimes="0;0.30;0.56;1"
+                     path="M88,272 L192,272 L212,300 L244,124 L276,340 L302,272 L336,272 L352,250 L368,272 L424,272"/>
+    </g>
+
+    <!-- Hotspot ripple burst at the peak -->
+    <circle cx="244" cy="124" r="10" fill="none" stroke="#FF8A3D" stroke-width="5" opacity="0">
+      <animate attributeName="r" dur="6s" repeatCount="indefinite"
+               values="10;10;55;55" keyTimes="0;0.53;0.68;1"/>
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+               values="0;0;0.75;0;0" keyTimes="0;0.53;0.56;0.68;1"/>
+    </circle>
+
+    <!-- Hotspot reticle ring draws around the peak -->
+    <circle cx="244" cy="124" r="26" pathLength="100" fill="none"
+            stroke="#FF8A3D" stroke-opacity="0.4" stroke-width="5"
+            stroke-dasharray="100" stroke-dashoffset="100">
+      <animate attributeName="stroke-dashoffset" dur="6s" repeatCount="indefinite"
+               values="100;100;0;0" keyTimes="0;0.56;0.66;1"/>
+    </circle>
+
+    <!-- Hotspot dot pops at the peak -->
+    <circle class="peak" cx="244" cy="124" r="14" fill="#FF8A3D" filter="url(#glow)" opacity="0">
+      <animate attributeName="opacity" dur="6s" repeatCount="indefinite"
+               values="0;0;1;1" keyTimes="0;0.52;0.56;1"/>
+    </circle>
+  </g>
+</svg>

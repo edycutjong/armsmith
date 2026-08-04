@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Armsmith icon: an Arm chip with a vitals trace running through it; the hotspot peak is marked in amber">
+  <defs>
+    <linearGradient id="plateG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1820"/>
+      <stop offset="100%" stop-color="#060D12"/>
+    </linearGradient>
+    <radialGradient id="washG" cx="0.24" cy="0.16" r="0.9">
+      <stop offset="0%" stop-color="var(--primary, #2EE6A6)" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="var(--primary, #2EE6A6)" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="var(--primary, #2EE6A6)" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="traceG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#A9FFDF"/>
+      <stop offset="45%" stop-color="var(--primary, #2EE6A6)"/>
+      <stop offset="100%" stop-color="#1EC488"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Plate -->
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#plateG)"/>
+  <rect x="32" y="32" width="448" height="448" rx="116" fill="url(#washG)"/>
+  <rect x="34" y="34" width="444" height="444" rx="114" fill="none" stroke="rgba(255,255,255,0.09)" stroke-width="3"/>
+
+  <!-- Chip body + pins (center kept clear for the trace spike) -->
+  <g stroke="rgba(236,246,241,0.28)" fill="none">
+    <rect x="136" y="136" width="240" height="240" rx="48" stroke-width="12" fill="rgba(46,230,166,0.045)"/>
+  </g>
+  <g stroke="rgba(236,246,241,0.22)" stroke-width="16" stroke-linecap="round">
+    <line x1="176" y1="108" x2="176" y2="132"/>
+    <line x1="336" y1="108" x2="336" y2="132"/>
+    <line x1="176" y1="380" x2="176" y2="404"/>
+    <line x1="336" y1="380" x2="336" y2="404"/>
+    <line x1="108" y1="176" x2="132" y2="176"/>
+    <line x1="108" y1="336" x2="132" y2="336"/>
+    <line x1="380" y1="176" x2="404" y2="176"/>
+    <line x1="380" y1="336" x2="404" y2="336"/>
+  </g>
+
+  <!-- Vitals trace through the silicon -->
+  <path d="M88,272 L192,272 L212,300 L244,124 L276,340 L302,272 L336,272 L352,250 L368,272 L424,272"
+        fill="none" stroke="url(#traceG)" stroke-width="24"
+        stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Hotspot reticle at the peak -->
+  <circle cx="244" cy="124" r="26" fill="none" stroke="var(--accent, #FF8A3D)" stroke-opacity="0.4" stroke-width="5"/>
+  <circle cx="244" cy="124" r="14" fill="var(--accent, #FF8A3D)" filter="url(#glow)"/>
+</svg>

@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armsmith — the agent that forges your repo for Arm</title>
+<meta name="description" content="Armsmith diagnoses why an AI repo is slow on aarch64 with a 13-rule anti-pattern pack, then opens a PR in which every fix has passed a reproduce-benchmark gate — median-of-N, MAD noise bands, output-hash equality. The agent proposes; the silicon decides. Tamper one digit and armsmith verify goes red.">
+<link rel="canonical" href="https://armsmith.edycu.dev/">
+<link rel="icon" type="image/svg+xml" href="./assets/icon.svg">
+<link rel="apple-touch-icon" href="./assets/icon-1024.png">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F4EE">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0A100E">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://armsmith.edycu.dev/">
+<meta property="og:site_name" content="Armsmith">
+<meta property="og:title" content="Armsmith — the agent that forges your repo for Arm">
+<meta property="og:description" content="Every other submission runs a model on Arm. Armsmith makes everyone else's repo fast on Arm — and refuses to lie about the numbers. The LLM proposes; only the reproduce gate can claim.">
+<meta property="og:image" content="https://armsmith.edycu.dev/assets/og-image.png">
+<meta property="og:image:width" content="2400">
+<meta property="og:image:height" content="1260">
+<meta property="og:image:alt" content="Armsmith reproduce gate: 6 findings, 4 proven, 2 dropped — noise band and hash mismatch — beside a terminal showing kept and dropped fixes.">
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Armsmith — the agent that forges your repo for Arm">
+<meta name="twitter:description" content="The LLM proposes; only the reproduce gate can claim. proposed 6 · proven 4 · refused 2 · faked 0.">
+<meta name="twitter:image" content="https://armsmith.edycu.dev/assets/og-image.png">
+<script>
+/* theme init — before first paint, guarded for private mode */
+(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}
+document.documentElement.classList.add('js');})();
+</script>
+<style>
+/* ============================================================
+   ARMSMITH — forge terminal / spec-sheet
+   Palette from the brand assets: green-black forge plate,
+   mint #2EE6A6 = proven, #F7941E = forge orange, red = refused.
+   Mono is the brand voice. No webfonts, no network, no purple.
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --font-sans:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:ui-monospace,"SF Mono",SFMono-Regular,"Cascadia Code","JetBrains Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --forge:#F7941E;           /* fixed graphic orange (buttons, marks) */
+  --forge-hi:#FFA53C;
+  --mint:#2EE6A6;            /* fixed graphic mint (dark plates) */
+  --ease:cubic-bezier(.22,.7,.25,1);
+
+  /* light theme (warm workshop paper) */
+  --bg:#F7F4EE; --bg2:#F1EDE3; --panel:#FFFFFF; --panel2:#F3EFE7;
+  --border:rgba(20,33,28,.14); --border-strong:rgba(20,33,28,.28);
+  --ink:#152019; --ink2:#2C3B34; --muted:#5C6D65;
+  --green:#0C7A58; --green-strong:#09644A;
+  --orange:#A85B00; --orange-on-alt:#8F4E00; --red:#B23A2B;
+  --grid-line:rgba(20,33,28,.05);
+  --glow-green:rgba(46,230,166,.20); --glow-orange:rgba(247,148,30,.18);
+  --header-bg:rgba(247,244,238,.82);
+  --shadow:0 24px 60px rgba(31,42,36,.13);
+  --btn-ink:#211203;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A100E; --bg2:#0C1310; --panel:#101A16; --panel2:#15211C;
+    --border:rgba(169,255,223,.12); --border-strong:rgba(169,255,223,.26);
+    --ink:#ECF6F1; --ink2:#CBDAD3; --muted:#93A79E;
+    --green:#2EE6A6; --green-strong:#A9FFDF;
+    --orange:#F7941E; --orange-on-alt:#F7941E; --red:#FF6E60;
+    --grid-line:rgba(46,230,166,.045);
+    --glow-green:rgba(46,230,166,.13); --glow-orange:rgba(247,148,30,.11);
+    --header-bg:rgba(9,15,13,.74);
+    --shadow:0 24px 70px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A100E; --bg2:#0C1310; --panel:#101A16; --panel2:#15211C;
+  --border:rgba(169,255,223,.12); --border-strong:rgba(169,255,223,.26);
+  --ink:#ECF6F1; --ink2:#CBDAD3; --muted:#93A79E;
+  --green:#2EE6A6; --green-strong:#A9FFDF;
+  --orange:#F7941E; --orange-on-alt:#F7941E; --red:#FF6E60;
+  --grid-line:rgba(46,230,166,.045);
+  --glow-green:rgba(46,230,166,.13); --glow-orange:rgba(247,148,30,.11);
+  --header-bg:rgba(9,15,13,.74);
+  --shadow:0 24px 70px rgba(0,0,0,.55);
+}
+
+html{overflow-x:clip;scroll-padding-top:96px}
+@media (prefers-reduced-motion: no-preference){ html{scroll-behavior:smooth} }
+body{
+  overflow-x:clip;
+  font-family:var(--font-sans);
+  font-size:1.0625rem;line-height:1.7;
+  color:var(--ink);background-color:var(--bg);
+  background-image:
+    linear-gradient(var(--grid-line) 1px,transparent 1px),
+    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:44px 44px;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;height:auto}
+::selection{background:var(--forge);color:#211203}
+
+a{color:var(--green);text-decoration:none}
+a:hover{text-decoration:underline;text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--forge);outline-offset:3px;border-radius:4px}
+
+.wrap{max-width:1120px;margin-inline:auto;padding-inline:clamp(20px,5vw,48px)}
+.mono{font-family:var(--font-mono)}
+
+.skip{
+  position:absolute;left:-9999px;top:0;z-index:200;
+  background:var(--forge);color:#211203;padding:10px 18px;
+  font-family:var(--font-mono);font-size:.85rem;border-radius:0 0 10px 0;
+}
+.skip:focus{left:0}
+
+/* ---------- header ---------- */
+.site-head{
+  position:sticky;top:0;z-index:100;
+  background:var(--header-bg);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border-bottom:1px solid transparent;
+  transition:border-color .3s var(--ease),box-shadow .3s var(--ease);
+}
+.site-head.scrolled{border-bottom-color:var(--border);box-shadow:0 8px 30px rgba(0,0,0,.10)}
+/* forge-heat reading-progress line, riding the header's bottom edge */
+.progress{position:absolute;left:0;bottom:-1px;height:2px;width:100%;transform:scaleX(var(--p,0));transform-origin:left;background:linear-gradient(90deg,var(--forge),var(--forge-hi));box-shadow:0 0 10px var(--glow-orange);opacity:0;transition:opacity .3s var(--ease)}
+.site-head.scrolled .progress{opacity:1}
+.head-in{display:flex;align-items:center;gap:20px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none}
+.brand:hover{text-decoration:none}
+.brand img{width:28px;height:28px;border-radius:7px}
+.brand b{font-family:var(--font-mono);font-size:1.02rem;font-weight:700;letter-spacing:.01em}
+.brand .cursor{display:inline-block;width:.55em;height:1.05em;background:var(--green);vertical-align:-.18em;margin-left:2px;animation:blink 2.2s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.site-nav{display:none;gap:26px;margin-left:auto}
+.site-nav a{
+  font-family:var(--font-mono);font-size:.8rem;letter-spacing:.06em;
+  color:var(--muted);text-transform:lowercase;position:relative;padding:4px 0;
+}
+.site-nav a::after{content:"";position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--forge);transform:scaleX(0);transform-origin:left;transition:transform .25s var(--ease)}
+.site-nav a:hover{color:var(--ink);text-decoration:none}
+.site-nav a:hover::after{transform:scaleX(1)}
+.site-nav a.active{color:var(--ink)}
+.site-nav a.active::after{transform:scaleX(1)}
+.head-actions{display:flex;align-items:center;gap:10px;margin-left:auto}
+.site-nav + .head-actions{margin-left:0}
+@media (min-width:900px){ .site-nav{display:flex} }
+
+.icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+  background:transparent;color:var(--ink);cursor:pointer;
+  transition:border-color .2s,transform .2s,background .2s;
+}
+.icon-btn:hover{border-color:var(--border-strong);transform:translateY(-1px);background:var(--panel)}
+.icon-btn svg{width:18px;height:18px}
+.ico-sun{display:none}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .ico-sun{display:block} :root:not([data-theme="light"]) .ico-moon{display:none} }
+:root[data-theme="dark"] .ico-sun{display:block}
+:root[data-theme="dark"] .ico-moon{display:none}
+:root[data-theme="light"] .ico-sun{display:none}
+:root[data-theme="light"] .ico-moon{display:block}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--font-mono);font-size:.88rem;font-weight:700;letter-spacing:.05em;
+  padding:15px 26px;border-radius:12px;border:1.5px solid transparent;
+  cursor:pointer;text-decoration:none;white-space:nowrap;
+  transition:transform .2s var(--ease),box-shadow .25s var(--ease),background .2s,border-color .2s,color .2s;
+}
+.btn:hover{text-decoration:none;transform:translateY(-2px)}
+.btn:active{transform:translateY(0)}
+.btn-forge{background:var(--forge);color:var(--btn-ink);box-shadow:0 6px 24px rgba(247,148,30,.28)}
+.btn-forge:hover{background:var(--forge-hi);box-shadow:0 10px 34px rgba(247,148,30,.42)}
+.btn-line{border-color:var(--border-strong);color:var(--ink);background:transparent}
+.btn-line:hover{border-color:var(--forge);color:var(--ink);background:var(--panel)}
+.btn-ghost{color:var(--muted);padding:15px 10px}
+.btn-ghost:hover{color:var(--ink)}
+.btn.disabled{
+  border:1.5px dashed var(--border-strong);color:var(--muted);cursor:not-allowed;
+  background:transparent;box-shadow:none;
+}
+.btn.disabled:hover{transform:none}
+.btn .arr{transition:transform .2s var(--ease)}
+.btn:hover .arr{transform:translateX(3px)}
+.btn-forge:hover .arr-d{transform:translateY(3px)}
+
+/* ---------- hero ---------- */
+.hero{position:relative;overflow:clip;padding:clamp(64px,9vw,110px) 0 clamp(48px,6vw,84px)}
+.hero::before,.hero::after{content:"";position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+.hero::before{width:640px;height:640px;left:-220px;top:-260px;background:radial-gradient(circle,var(--glow-green),transparent 65%)}
+.hero::after{width:720px;height:720px;right:-260px;bottom:-380px;background:radial-gradient(circle,var(--glow-orange),transparent 65%)}
+.hero .wrap{position:relative;z-index:1}
+
+.eyebrow{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--font-mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted);border:1px solid var(--border);border-radius:999px;
+  padding:8px 16px;background:var(--panel);
+}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px var(--mint);flex:none}
+
+h1{
+  margin-top:26px;
+  font-size:clamp(2.7rem,7.4vw,5.4rem);
+  line-height:1.03;letter-spacing:-.035em;font-weight:800;
+  max-width:15ch;
+}
+h1 .l2{color:var(--green)}
+.u-dash{text-decoration:underline;text-decoration-style:dashed;text-decoration-thickness:3px;text-decoration-color:var(--muted);text-underline-offset:.16em}
+.u-solid{text-decoration:underline;text-decoration-thickness:5px;text-decoration-color:var(--forge);text-underline-offset:.14em}
+
+.tagline{margin-top:26px;font-size:clamp(1.06rem,2vw,1.3rem);line-height:1.6;color:var(--ink2);max-width:62ch}
+.tagline b{color:var(--ink)}
+
+.mech{
+  margin-top:20px;font-family:var(--font-mono);font-size:.8rem;line-height:1.9;
+  color:var(--muted);letter-spacing:.02em;max-width:74ch;
+}
+.mech .g{color:var(--green);font-weight:700}
+.mech .o{color:var(--orange);font-weight:700}
+
+.cta-row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:34px}
+
+.hero-stats{
+  display:flex;flex-wrap:wrap;gap:0;margin-top:44px;
+  border-top:1px solid var(--border);
+}
+.hstat{padding:20px 28px 4px 0;flex:1 1 150px;min-width:0}
+.hstat + .hstat{padding-left:28px;border-left:1px solid var(--border)}
+.hstat .n{font-family:var(--font-mono);font-size:clamp(1.7rem,3vw,2.3rem);font-weight:700;letter-spacing:-.02em}
+.hstat .n em{font-style:normal;color:var(--green)}
+.hstat .n .zero{color:var(--orange)}
+.hstat .l{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+@media (max-width:640px){
+  .hstat{flex:1 1 46%;padding-right:16px}
+  .hstat + .hstat{padding-left:16px}
+  .hstat:nth-child(3){border-left:none;padding-left:0}
+}
+
+/* ---------- terminal ---------- */
+.term{
+  --t-bg:#0A1210;--t-hd:#0D1714;--t-border:rgba(169,255,223,.15);
+  --t-text:#D9E7E0;--t-mut:#7E948A;--t-green:#2EE6A6;--t-orange:#FFA53C;--t-red:#FF6E60;
+  background:var(--t-bg);border:1px solid var(--t-border);border-radius:16px;
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.term-hd{
+  display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:var(--t-hd);border-bottom:1px solid var(--t-border);
+}
+.term-hd .dots{display:flex;gap:6px}
+.term-hd .dots i{width:10px;height:10px;border-radius:50%;background:#25332D}
+.term-hd .dots i:last-child{background:var(--t-green)}
+.term-hd .t{font-family:var(--font-mono);font-size:.74rem;color:var(--t-mut);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term-hd svg{margin-left:auto;flex:none;opacity:.9}
+.badge-replay{
+  flex:none;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--t-orange);border:1px solid rgba(255,165,60,.45);border-radius:999px;padding:3px 9px;
+}
+.term pre{
+  padding:20px 22px;overflow-x:auto;
+  font-family:var(--font-mono);font-size:.83rem;line-height:1.85;color:var(--t-text);
+  tab-size:2;
+}
+.term .c{color:var(--t-mut)}          /* comment / dim   */
+.term .p{color:var(--t-mut)}          /* prompt $        */
+.term .k{color:var(--t-green);font-weight:700}   /* keep / ok  */
+.term .d{color:var(--t-red);font-weight:700}     /* drop / fail */
+.term .w{color:var(--t-orange);font-weight:700}  /* warn / replay */
+.term .cmd{color:#ECF6F1;font-weight:600}
+
+.hero-term{max-width:880px;margin-top:52px}
+.hero-term-cap{
+  font-family:var(--font-mono);font-size:.74rem;color:var(--muted);
+  margin-top:12px;letter-spacing:.04em;
+}
+
+/* ---------- sections ---------- */
+section{padding-block:clamp(68px,9vw,116px);position:relative}
+.sec-alt{background:var(--bg2)}
+.ruler{
+  height:12px;margin-bottom:clamp(28px,4vw,44px);
+  background:
+    repeating-linear-gradient(90deg,var(--border-strong) 0 1px,transparent 1px 72px),
+    repeating-linear-gradient(90deg,var(--border) 0 1px,transparent 1px 12px);
+  background-size:auto 12px,auto 7px;background-repeat:repeat-x;background-position:left top;
+}
+.sec-head{display:grid;gap:14px;margin-bottom:clamp(34px,5vw,54px)}
+@media (min-width:900px){ .sec-head{grid-template-columns:190px 1fr;gap:32px} }
+.sec-no{
+  font-family:var(--font-mono);font-size:.76rem;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--orange);padding-top:10px;
+}
+.sec-no::before{content:"";display:block;width:44px;height:3px;background:var(--forge);margin-bottom:12px}
+.sec-alt .sec-no{color:var(--orange-on-alt)}
+h2{font-size:clamp(1.85rem,4.2vw,2.9rem);line-height:1.12;letter-spacing:-.025em;font-weight:800;max-width:22ch}
+.lead{margin-top:16px;font-size:clamp(1rem,1.6vw,1.15rem);color:var(--ink2);max-width:64ch}
+.lead b{color:var(--ink)}
+
+/* ---------- problem ---------- */
+.problem-grid{display:grid;gap:28px}
+@media (min-width:900px){ .problem-grid{grid-template-columns:190px 1fr} .problem-grid > .spacer{display:block} }
+.fieldnote{
+  border-left:3px solid var(--forge);background:var(--panel);
+  border-radius:0 14px 14px 0;padding:22px 26px;max-width:64ch;
+  font-size:1.05rem;line-height:1.7;color:var(--ink2);font-style:italic;
+  box-shadow:0 8px 30px rgba(0,0,0,.06);
+}
+.fieldnote .src{display:block;margin-top:10px;font-style:normal;font-family:var(--font-mono);font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.lore{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;max-width:760px}
+.lore span{
+  font-family:var(--font-mono);font-size:.78rem;color:var(--ink2);
+  border:1px solid var(--border);border-radius:9px;padding:8px 13px;background:var(--panel);
+  transition:border-color .2s,transform .2s;
+}
+.lore span:hover{border-color:var(--forge);transform:translateY(-1px)}
+.punch{margin-top:26px;font-size:clamp(1.05rem,1.8vw,1.25rem);max-width:60ch;color:var(--ink)}
+.punch em{font-style:normal;color:var(--orange);font-weight:700}
+
+/* ---------- gate / trust ---------- */
+.gate-grid{display:grid;gap:26px;align-items:start}
+.gate-grid > *{min-width:0}
+@media (min-width:980px){ .gate-grid{grid-template-columns:1.05fr .95fr} }
+.pillars{display:grid;gap:14px}
+.pillar{
+  display:grid;grid-template-columns:46px 1fr;gap:16px;align-items:start;
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px 22px;
+  transition:border-color .25s var(--ease),transform .25s var(--ease),box-shadow .25s var(--ease);
+}
+.pillar:hover{border-color:var(--border-strong);transform:translateY(-3px);box-shadow:var(--shadow)}
+.pillar .ic{
+  width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  background:var(--panel2);border:1px solid var(--border);color:var(--green);
+}
+.pillar:nth-child(2) .ic{color:var(--orange)}
+.pillar h3{font-size:1.05rem;letter-spacing:-.01em}
+.pillar h3 .mono{font-size:.78rem;color:var(--muted);font-weight:600}
+.pillar p{margin-top:6px;font-size:.93rem;color:var(--ink2);line-height:1.65}
+.pillar p code{font-family:var(--font-mono);font-size:.84em;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.pillar .quote{margin-top:8px;font-family:var(--font-mono);font-size:.74rem;color:var(--muted)}
+
+/* ---------- loop ---------- */
+.loop-media{
+  background:#0A1210;border:1px solid rgba(169,255,223,.15);border-radius:20px;
+  overflow:hidden;box-shadow:var(--shadow);
+}
+.loop-media img{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:1280/320}
+@media (prefers-reduced-motion: reduce){
+  .loop-media img{aspect-ratio:1280/640}
+}
+.loop-cap{font-family:var(--font-mono);font-size:.74rem;color:var(--muted);margin-top:12px;letter-spacing:.04em}
+.steps{list-style:none;counter-reset:step;margin-top:44px;position:relative;max-width:840px}
+.steps::before{content:"";position:absolute;left:17px;top:14px;bottom:14px;width:1px;background:var(--border-strong)}
+.steps li{
+  counter-increment:step;position:relative;padding:0 0 26px 60px;
+}
+.steps li:last-child{padding-bottom:0}
+.steps li::before{
+  content:"0" counter(step);
+  position:absolute;left:0;top:0;width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:.72rem;font-weight:700;letter-spacing:.05em;
+  background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);
+}
+.steps li.gate::before{background:var(--forge);border-color:var(--forge);color:#211203}
+.steps h3{font-size:1.02rem;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.steps h3 .mono{font-size:.76rem;color:var(--muted);font-weight:600}
+.steps p{margin-top:4px;font-size:.93rem;color:var(--ink2)}
+.steps li.gate h3 b{color:var(--orange)}
+.cmd-chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:36px}
+.cmd-chips code{
+  font-family:var(--font-mono);font-size:.8rem;color:var(--green);
+  border:1px solid var(--border);border-radius:999px;padding:7px 15px;background:var(--panel);
+  transition:border-color .2s,transform .2s;
+}
+.cmd-chips code:hover{border-color:var(--green);transform:translateY(-1px)}
+.cmd-chips .lbl{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);align-self:center;margin-right:4px}
+
+/* ---------- receipts / counter ---------- */
+.counter{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
+@media (min-width:820px){ .counter{grid-template-columns:repeat(4,1fr)} }
+.ct{
+  background:var(--panel);border:1px solid var(--border);border-radius:18px;
+  padding:clamp(20px,3vw,30px);text-align:left;position:relative;overflow:hidden;
+  transition:transform .25s var(--ease),border-color .25s var(--ease),box-shadow .25s var(--ease);
+}
+.ct:hover{transform:translateY(-4px);box-shadow:var(--shadow)}
+.ct .n{font-family:var(--font-mono);font-weight:700;font-size:clamp(3rem,7vw,4.6rem);line-height:1;letter-spacing:-.03em}
+.ct .t{font-family:var(--font-mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;margin-top:10px;color:var(--muted)}
+.ct .s{font-size:.86rem;color:var(--muted);margin-top:8px;line-height:1.55}
+.ct-proposed .n{color:var(--ink2)}
+.ct-proven{border-color:var(--green)}
+.ct-proven .n{color:var(--green)}
+.ct-proven .t{color:var(--green)}
+.ct-refused .n{color:var(--red)}
+.ct-refused .t{color:var(--red)}
+.ct-faked{border:2px solid var(--forge);box-shadow:0 0 0 4px var(--glow-orange)}
+.ct-faked .n{color:transparent;-webkit-text-stroke:2.5px var(--forge);text-stroke:2.5px var(--forge)}
+@supports not (-webkit-text-stroke:1px black){ .ct-faked .n{color:var(--orange)} }
+.ct-faked .t{color:var(--orange)}
+
+.refuse-card{
+  margin-top:26px;background:var(--panel);border:1px solid var(--border);border-radius:18px;
+  padding:clamp(22px,3.4vw,32px);
+}
+.refuse-card h3{font-size:1.15rem;letter-spacing:-.01em}
+.refuse-card h3 span{color:var(--orange)}
+.refuse-list{list-style:none;margin-top:16px;display:grid;gap:0}
+.refuse-list li{
+  display:grid;grid-template-columns:26px 1fr;gap:12px;align-items:start;
+  font-family:var(--font-mono);font-size:.84rem;line-height:1.7;color:var(--ink2);
+  padding:13px 0;border-top:1px solid var(--border);
+}
+.refuse-list li:first-child{border-top:none}
+.refuse-list .m{color:var(--orange);font-weight:700}
+.refuse-list b{color:var(--ink)}
+.refuse-list .tag{
+  display:inline-block;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;
+  border:1px solid var(--border-strong);border-radius:6px;padding:1px 7px;color:var(--muted);margin-left:6px;white-space:nowrap;
+}
+.refuse-foot{margin-top:18px;font-size:.95rem;color:var(--ink)}
+.refuse-foot b{color:var(--orange)}
+
+/* ---------- artifacts ---------- */
+.bento{display:grid;gap:16px}
+@media (min-width:900px){ .bento{grid-template-columns:repeat(3,1fr)} .b-wide{grid-column:1/-1} }
+.bcard{
+  background:var(--panel);border:1px solid var(--border);border-radius:18px;
+  padding:clamp(22px,3vw,30px);
+  transition:transform .25s var(--ease),border-color .25s var(--ease),box-shadow .25s var(--ease);
+}
+.bcard:hover{transform:translateY(-4px);border-color:var(--border-strong);box-shadow:var(--shadow)}
+.bcard .k{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--orange)}
+.bcard h3{font-size:1.18rem;margin-top:8px;letter-spacing:-.015em}
+.bcard p{margin-top:8px;font-size:.93rem;color:var(--ink2);line-height:1.65}
+.bcard p code, .bcard li code{font-family:var(--font-mono);font-size:.84em;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+.rules-grid{
+  display:grid;gap:8px;margin-top:20px;
+  grid-template-columns:repeat(auto-fill,minmax(158px,1fr));
+}
+.rule{
+  font-family:var(--font-mono);font-size:.72rem;line-height:1.45;
+  border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:var(--bg);
+  display:flex;gap:8px;align-items:baseline;
+  transition:border-color .2s,transform .2s;
+}
+.rule:hover{border-color:var(--green);transform:translateY(-1px)}
+.rule b{color:var(--orange);flex:none}
+.rule span{color:var(--ink2)}
+.rule .lp{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 6px var(--mint);flex:none;align-self:center;margin-left:auto}
+.rules-legend{margin-top:14px;font-family:var(--font-mono);font-size:.74rem;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rules-legend .lp{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 6px var(--mint)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ---------- quickstart ---------- */
+.qs-card{position:relative;max-width:960px}
+.copy-btn{
+  position:absolute;top:10px;right:10px;z-index:2;
+  font-family:var(--font-mono);font-size:.72rem;letter-spacing:.08em;
+  color:#D9E7E0;background:rgba(169,255,223,.08);border:1px solid rgba(169,255,223,.25);
+  border-radius:8px;padding:7px 13px;cursor:pointer;
+  transition:background .2s,border-color .2s,color .2s;
+}
+.copy-btn:hover{background:rgba(169,255,223,.16);border-color:rgba(169,255,223,.5)}
+.copy-btn.ok{color:#2EE6A6;border-color:#2EE6A6}
+.tamper{
+  margin-top:26px;display:grid;gap:22px;align-items:center;max-width:960px;
+  border:1.5px dashed var(--border-strong);border-radius:18px;padding:clamp(20px,3vw,28px);
+  background:var(--panel);
+}
+@media (min-width:900px){ .tamper{grid-template-columns:1fr 1.1fr} }
+.tamper h3{font-size:1.2rem;letter-spacing:-.015em}
+.tamper h3 span{color:var(--red)}
+.tamper p{margin-top:8px;font-size:.93rem;color:var(--ink2)}
+.tamper .term{box-shadow:none}
+.arm-note{
+  margin-top:26px;max-width:960px;font-size:.93rem;color:var(--muted);
+  border-left:3px solid var(--green);padding:6px 0 6px 18px;
+}
+.arm-note b{color:var(--ink)}
+.arm-note code{font-family:var(--font-mono);font-size:.85em}
+
+/* ---------- faq ---------- */
+.faq{max-width:860px}
+.faq details{border-top:1px solid var(--border)}
+.faq details:last-child{border-bottom:1px solid var(--border)}
+.faq summary{
+  list-style:none;cursor:pointer;display:flex;align-items:baseline;gap:18px;
+  padding:22px 44px 22px 2px;position:relative;
+  font-weight:700;font-size:1.04rem;letter-spacing:-.01em;
+  transition:color .2s;
+}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary:hover{color:var(--green)}
+.faq summary .qno{font-family:var(--font-mono);font-size:.74rem;color:var(--orange);flex:none;padding-top:2px}
+.faq summary::after{
+  content:"+";position:absolute;right:6px;top:50%;translate:0 -50%;
+  font-family:var(--font-mono);font-size:1.3rem;font-weight:400;color:var(--muted);
+  transition:transform .25s var(--ease),color .2s;
+}
+.faq details[open] summary::after{transform:rotate(45deg);color:var(--forge)}
+.faq .a{padding:0 2px 26px 44px;color:var(--ink2);font-size:.97rem;max-width:66ch}
+.faq .a code{font-family:var(--font-mono);font-size:.85em;background:var(--panel2);border:1px solid var(--border);border-radius:6px;padding:1px 6px}
+@media (prefers-reduced-motion: no-preference){
+  .faq details[open] .a{animation:faqIn .3s var(--ease)}
+  @keyframes faqIn{from{opacity:0;translate:0 -6px}to{opacity:1}}
+}
+
+/* ---------- final CTA (forge plate) ---------- */
+.forge-cta{padding-block:clamp(64px,8vw,100px)}
+.forge-plate{
+  position:relative;overflow:clip;border-radius:26px;
+  background:#0A1210;border:1px solid rgba(169,255,223,.16);
+  padding:clamp(40px,6vw,80px) clamp(24px,5vw,72px);
+  text-align:center;box-shadow:var(--shadow);
+  background-image:
+    linear-gradient(rgba(46,230,166,.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(46,230,166,.05) 1px,transparent 1px);
+  background-size:44px 44px;
+}
+.forge-plate::before,.forge-plate::after{content:"";position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none}
+.forge-plate::before{width:480px;height:480px;left:-160px;top:-220px;background:radial-gradient(circle,rgba(46,230,166,.20),transparent 65%)}
+.forge-plate::after{width:560px;height:560px;right:-200px;bottom:-300px;background:radial-gradient(circle,rgba(247,148,30,.22),transparent 65%)}
+.forge-plate > *{position:relative;z-index:1}
+.forge-plate .k{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;color:#FFA53C}
+.forge-plate h2{color:#ECF6F1;margin:14px auto 0;font-size:clamp(2.1rem,5vw,3.4rem);max-width:16ch}
+.forge-plate h2 em{font-style:normal;color:#2EE6A6}
+.forge-plate p{color:#B9CCC3;margin:18px auto 0;max-width:56ch;font-size:1.02rem}
+.forge-plate .cta-row{justify-content:center;margin-top:34px}
+.forge-plate .btn-line{border-color:rgba(236,246,241,.4);color:#ECF6F1}
+.forge-plate .btn-line:hover{border-color:#2EE6A6;background:rgba(46,230,166,.08)}
+.forge-plate .btn.disabled{border-color:rgba(236,246,241,.28);color:#8FA79D}
+.forge-meta{margin-top:30px;font-family:var(--font-mono);font-size:.74rem;letter-spacing:.1em;color:#7E948A;display:flex;justify-content:center;gap:18px;flex-wrap:wrap}
+.forge-meta a{color:#2EE6A6}
+
+/* ---------- footer ---------- */
+.site-foot{border-top:1px solid var(--border);background:var(--bg2);padding:clamp(44px,6vw,64px) 0 34px}
+.foot-grid{display:grid;gap:36px}
+@media (min-width:820px){ .foot-grid{grid-template-columns:1.4fr 1fr 1fr} }
+.foot-brand{display:flex;align-items:flex-start;gap:12px}
+.foot-brand img{width:34px;height:34px;border-radius:9px;flex:none}
+.foot-brand b{font-family:var(--font-mono);font-size:1rem}
+.foot-brand p{margin-top:6px;font-size:.9rem;color:var(--muted);max-width:34ch}
+.foot-col h3{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--orange);margin-bottom:14px}
+.foot-col ul{list-style:none}
+.foot-col li{margin-bottom:9px;font-size:.92rem}
+.foot-col a{color:var(--ink2)}
+.foot-col a:hover{color:var(--green)}
+.foot-col .dim{color:var(--muted)}
+.foot-col .dim code{font-family:var(--font-mono);font-size:.85em}
+.foot-bar{
+  margin-top:44px;padding-top:22px;border-top:1px solid var(--border);
+  display:flex;flex-wrap:wrap;gap:12px 26px;align-items:center;justify-content:space-between;
+  font-family:var(--font-mono);font-size:.74rem;color:var(--muted);letter-spacing:.03em;
+}
+.foot-bar .ctr{color:var(--ink2)}
+.foot-bar .ctr .g{color:var(--green)}
+.foot-bar .ctr .r{color:var(--red)}
+.foot-bar .ctr .o{color:var(--orange)}
+
+/* ---------- reveal on scroll ---------- */
+html.js .reveal{opacity:0;translate:0 22px;transition:opacity .7s var(--ease),translate .7s var(--ease)}
+html.js .reveal.in{opacity:1;translate:0 0}
+html.js .reveal.d1{transition-delay:.08s}
+html.js .reveal.d2{transition-delay:.16s}
+html.js .reveal.d3{transition-delay:.24s}
+
+/* hero entrance */
+@media (prefers-reduced-motion: no-preference){
+  .h-anim{opacity:0;translate:0 18px;animation:heroIn .8s var(--ease) forwards}
+  .h-anim.h2{animation-delay:.12s}
+  .h-anim.h3{animation-delay:.24s}
+  .h-anim.h4{animation-delay:.36s}
+  .h-anim.h5{animation-delay:.5s}
+  .h-anim.h6{animation-delay:.66s}
+  @keyframes heroIn{to{opacity:1;translate:0 0}}
+}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
+  html.js .reveal{opacity:1;translate:0 0}
+  .brand .cursor{animation:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ══════════════ header · element 2 ══════════════ -->
+<header class="site-head" id="siteHead">
+  <div class="wrap head-in">
+    <a class="brand" href="#top" aria-label="Armsmith — back to top">
+      <img src="./assets/icon.svg" alt="" aria-hidden="true" width="28" height="28">
+      <b>armsmith<span class="cursor" aria-hidden="true"></span></b>
+    </a>
+    <nav class="site-nav" aria-label="Sections">
+      <a href="#problem">problem</a>
+      <a href="#gate">the gate</a>
+      <a href="#loop">the loop</a>
+      <a href="#receipts">receipts</a>
+      <a href="#artifacts">artifacts</a>
+      <a href="#quickstart">run it</a>
+      <a href="#faq">faq</a>
+    </nav>
+    <div class="head-actions">
+      <button class="icon-btn" id="themeBtn" type="button" aria-label="Toggle color theme">
+        <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/></svg>
+        <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.4 14.2A8.5 8.5 0 0 1 9.8 3.6a8.5 8.5 0 1 0 10.6 10.6Z"/></svg>
+      </button>
+      <a class="icon-btn" href="https://github.com/edycutjong/armsmith" aria-label="Armsmith on GitHub">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      </a>
+    </div>
+  </div>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+</header>
+
+<main id="main">
+<span id="top" aria-hidden="true"></span>
+<div id="headSentinel" aria-hidden="true"></div>
+
+<!-- ══════════════ hero · elements 3, 4, 5, 6 ══════════════ -->
+<section class="hero" aria-labelledby="heroTitle">
+  <div class="wrap">
+    <p class="eyebrow h-anim mono"><span class="dot" aria-hidden="true"></span>Arm AI Optimization Challenge 2026 · Track 2 — Cloud AI</p>
+
+    <h1 id="heroTitle" class="h-anim h2">The agent <span class="u-dash">proposes</span>.<br>
+    <span class="l2">The silicon <span class="u-solid">decides</span>.</span></h1>
+
+    <p class="tagline h-anim h3">Every other submission runs a model on Arm. <b>Armsmith</b> makes everyone
+    else&rsquo;s repo fast on Arm &mdash; and refuses to lie about the numbers.</p>
+
+    <p class="mech h-anim h4" aria-label="How claims are made">LLM planner <span class="c">→ proposes</span> &nbsp;·&nbsp; <span class="o">REPRODUCE GATE</span> <span class="c">(median-of-N · MAD noise band · output-hash equality)</span> <span class="g">→ the only thing allowed to claim</span></p>
+
+    <div class="cta-row h-anim h5">
+      <a class="btn btn-forge" href="#quickstart">See the 2-min proof <span class="arr arr-d" aria-hidden="true">↓</span></a>
+      <a class="btn btn-line" href="./deck.html">Pitch deck <span class="arr" aria-hidden="true">→</span></a>
+      <a class="btn btn-ghost" href="https://github.com/edycutjong/armsmith">GitHub <span aria-hidden="true">↗</span></a>
+    </div>
+
+    <div class="hero-stats h-anim h6" role="list" aria-label="Honest project statistics">
+      <div class="hstat" role="listitem">
+        <div class="n mono">219</div>
+        <div class="l">tests passing · fully offline</div>
+      </div>
+      <div class="hstat" role="listitem">
+        <div class="n mono">13</div>
+        <div class="l">aarch64 rules · 10 cite Arm Learning Paths</div>
+      </div>
+      <div class="hstat" role="listitem">
+        <div class="n mono"><em>4</em>/6</div>
+        <div class="l">fixes proven on seed · 2 refused</div>
+      </div>
+      <div class="hstat" role="listitem">
+        <div class="n mono"><span class="zero">0</span></div>
+        <div class="l">fabricated numbers</div>
+      </div>
+    </div>
+
+    <figure class="hero-term h-anim h6">
+      <div class="term">
+        <div class="term-hd">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="t">armsmith — reproduce gate · scenario_ragserve</span>
+          <span class="badge-replay">replay · synthetic</span>
+          <svg width="72" height="16" viewBox="0 0 72 16" aria-hidden="true"><polyline points="0,9 18,9 24,12 32,2 40,14 46,9 58,9 62,6 66,9 72,9" fill="none" stroke="#2EE6A6" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        </div>
+<pre><span class="p">$</span> <span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>
+  <span class="c">fingerprint</span>  lscpu → dotprod / i8mm / SVE / SVE2 / BF16 / SME routing
+  <span class="c">scan</span>         13-rule aarch64 pack → findings on ragserve
+  <span class="c">plan</span>         6 candidate fixes queued <span class="c">— the planner proposes; it cannot claim</span>
+  <span class="c">gate</span>         median-of-N · MAD noise band (k=3) · output-hash equality
+  <span class="k">KEEP × 4</span>     Δ outside noise band · outputs hash-equal
+  <span class="d">DROP × 1</span>     inside noise band <span class="c">— refused, reported</span>
+  <span class="d">DROP × 1</span>     output-hash mismatch <span class="c">— refused, reported</span>
+  <span class="c">report</span>       signed ed25519 · canonical-JSON sha256 · raw samples embedded
+
+<span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
+  <span class="k">VERIFY OK</span> — every statistic recomputed from the embedded raw samples</pre>
+      </div>
+      <figcaption class="hero-term-cap">Real gate behavior, provable offline. Replay data is synthetic and labeled at every layer — the live Graviton multiplier stays <b>[PENDING]</b> until real hardware measures it.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ══════════════ §01 problem ══════════════ -->
+<section id="problem" aria-labelledby="problemTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§01 · the problem</p>
+      <div>
+        <h2 id="problemTitle">The Graviton lore nobody has.</h2>
+        <p class="lead">Arm64 cloud — Graviton, Ampere, Axion — is reported, per cloud vendors&rsquo; published
+        price-performance benchmarks, to run AI inference <b>20–40% cheaper per unit of throughput</b> —
+        market context, not a number Armsmith measures. Capturing it takes performance-engineering lore
+        almost nobody carries around:</p>
+      </div>
+    </div>
+    <div class="problem-grid">
+      <div class="spacer" aria-hidden="true"></div>
+      <div>
+        <blockquote class="fieldnote reveal">
+          A solo founder&rsquo;s AWS bill doubles overnight when her RAG service outgrows its instance.
+          The Graviton migration guide is 40 pages of compiler flags she doesn&rsquo;t understand —
+          and her next invoice lands in 9 days.
+          <span class="src">— the seed scenario Armsmith is forged against</span>
+        </blockquote>
+        <div class="lore reveal d1" aria-label="Examples of aarch64 migration lore">
+          <span>amd64 image pins → QEMU emulation</span>
+          <span>-mcpu / -march flags</span>
+          <span>BLAS backend choice</span>
+          <span>silent float64 coercion</span>
+          <span>GGUF quant ↔ ISA repack paths</span>
+          <span>threads × workers vs vCPUs</span>
+        </div>
+        <p class="punch reveal d2">Teams either never migrate — or migrate and silently leave <em>2–3×</em> on
+        the table. Arm&rsquo;s own Learning Paths teach a human to fix this by hand. <b>Nothing automates the
+        loop.</b> Armsmith does — without ever being allowed to grade its own homework.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §02 the gate ══════════════ -->
+<section id="gate" class="sec-alt" aria-labelledby="gateTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§02 · the trust inversion</p>
+      <div>
+        <h2 id="gateTitle">Any agent can propose fixes.<br>Almost none can prove them.</h2>
+        <p class="lead">Armsmith inverts the trust. The LLM planner <b>proposes</b>; only the reproduce gate can
+        <b>claim</b>. A fix that can&rsquo;t clear the noise band — or changes the output — is deleted by the
+        tool itself and reported as refused. Never hidden.</p>
+      </div>
+    </div>
+    <div class="gate-grid">
+      <figure class="reveal">
+        <div class="term">
+          <div class="term-hd">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="t">the 20-second trust proof</span>
+          </div>
+<pre><span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
+  <span class="k">VERIFY OK</span>
+
+<span class="p">$</span> <span class="cmd">vi report.json</span>   <span class="c"># change ONE digit in any "samples" array</span>
+<span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
+  <span class="d">VERIFY FAILED</span></pre>
+        </div>
+        <figcaption class="hero-term-cap">Raw samples ship embedded beside every claimed statistic —
+        so anyone can re-run the arithmetic instead of trusting a screenshot.</figcaption>
+      </figure>
+      <div class="pillars">
+        <div class="pillar reveal d1">
+          <div class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18l-7 8v6l-4 2v-8L3 4Z"/></svg></div>
+          <div>
+            <h3>Reproduce gate <span class="mono">· armsmith.gate</span></h3>
+            <p>Median-of-N runs, a scaled-MAD noise band <code>k·√(smad_a²+smad_b²)</code> with k=3, and
+            output-hash equality. In-band deltas are reported as <em>no change</em> — never as wins.</p>
+          </div>
+        </div>
+        <div class="pillar reveal d2">
+          <div class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4.5 5v6c0 4.8 3.2 8.6 7.5 10 4.3-1.4 7.5-5.2 7.5-10V5L12 2Z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/></svg></div>
+          <div>
+            <h3>Tamper-evident reports <span class="mono">· armsmith.report</span></h3>
+            <p>Canonical-JSON sha256 content addressing plus an ed25519 signature. <code>armsmith verify</code>
+            recomputes every statistic and gate verdict from the embedded samples — tamper one digit, it goes red.</p>
+          </div>
+        </div>
+        <div class="pillar reveal d3">
+          <div class="ic" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 2v3M14 2v3M10 19v3M14 19v3M2 10h3M2 14h3M19 10h3M19 14h3"/></svg></div>
+          <div>
+            <h3>ISA witness <span class="mono">· armsmith.witness</span></h3>
+            <p>A before/after <code>objdump</code> count of SDOT / UDOT / SMMLA / USMMLA — e.g.
+            <code>dotprod 0 → 4</code> — deterministic proof the Arm kernel path is actually emitted.</p>
+            <p class="quote">“Wall-clock can be argued with; emitted instructions cannot.”</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §03 the loop ══════════════ -->
+<section id="loop" aria-labelledby="loopTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§03 · the loop</p>
+      <div>
+        <h2 id="loopTitle">Diagnose → gate → signed report → PR.</h2>
+        <p class="lead">One command walks a repo from &ldquo;slow on aarch64&rdquo; to a pull request in which
+        every surviving fix carries its own evidence — and every refused fix carries its reason.</p>
+      </div>
+    </div>
+
+    <figure class="reveal">
+      <div class="loop-media">
+        <picture>
+          <source media="(prefers-reduced-motion: reduce)" srcset="./assets/readme-hero.png">
+          <img src="./assets/readme-hero-animated.svg"
+               alt="Diagram of the Armsmith loop: findings move from a repo through the reproduce gate; proven fixes reach the pull request, and unproven fixes are dropped, with reasons shown.">
+        </picture>
+      </div>
+      <figcaption class="loop-cap">findings → reproduce gate → proven fixes reach the PR · unproven fixes are dropped, with reasons</figcaption>
+    </figure>
+
+    <ol class="steps">
+      <li class="reveal">
+        <h3>Host fingerprint <span class="mono">lscpu → ISA routing</span></h3>
+        <p>dotprod / i8mm / SVE / SVE2 / BF16 / SME detection decides which fixes are even eligible.</p>
+      </li>
+      <li class="reveal">
+        <h3>13-rule scan <span class="mono">static + recorded probes</span></h3>
+        <p>AST, Dockerfile and CI analysis plus recorded runtime probes surface aarch64 anti-patterns R1–R13.</p>
+      </li>
+      <li class="reveal">
+        <h3>Planner orders fixes <span class="mono">proposes — cannot claim</span></h3>
+        <p>Deterministic fallback planner today; the Claude tool-use loop is an honest <code class="mono">TODO(S1)</code>.</p>
+      </li>
+      <li class="gate reveal">
+        <h3><b>REPRODUCE GATE</b> <span class="mono">the only voice that counts</span></h3>
+        <p>Keep only what lands outside the noise band <b>and</b> keeps outputs hash-equal. Everything else: dropped, with a machine-readable reason.</p>
+      </li>
+      <li class="reveal">
+        <h3>Signed report → PR <span class="mono">ed25519 + sha256 · dry-run</span></h3>
+        <p>An evidence table per surviving fix — <span class="mono">metric · before · after · Δ · noise band</span> —
+        plus the drop log. PR rendering is dry-run today; posting lands at S1.</p>
+      </li>
+    </ol>
+
+    <div class="cmd-chips reveal" aria-label="The Armsmith command surface">
+      <span class="lbl">the surface</span>
+      <code>armsmith scan</code>
+      <code>armsmith diagnose</code>
+      <code>armsmith witness</code>
+      <code>armsmith verify</code>
+      <code>armsmith pr</code>
+      <code>armsmith ci</code>
+      <code>armsmith rules export</code>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §04 receipts (honest social proof) ══════════════ -->
+<section id="receipts" class="sec-alt" aria-labelledby="receiptsTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§04 · the receipts</p>
+      <div>
+        <h2 id="receiptsTitle">Refusal is a feature.</h2>
+        <p class="lead">On the <code class="mono">ragserve</code> seed, six candidate fixes entered the gate.
+        This counter is the whole brand — and the last cell is the point:</p>
+      </div>
+    </div>
+
+    <div class="counter" role="list" aria-label="Gate disposition on the ragserve seed">
+      <div class="ct ct-proposed reveal" role="listitem">
+        <div class="n">6</div>
+        <div class="t">proposed</div>
+        <p class="s">candidate fixes queued by the planner on the seed repo.</p>
+      </div>
+      <div class="ct ct-proven reveal d1" role="listitem">
+        <div class="n">4</div>
+        <div class="t">proven</div>
+        <p class="s">outside the noise band, outputs hash-equal — allowed into the PR.</p>
+      </div>
+      <div class="ct ct-refused reveal d2" role="listitem">
+        <div class="n">2</div>
+        <div class="t">refused</div>
+        <p class="s">1 inside the noise band · 1 output-hash mismatch. Deleted by the tool, reported in full.</p>
+      </div>
+      <div class="ct ct-faked reveal d3" role="listitem">
+        <div class="n">0</div>
+        <div class="t">faked</div>
+        <p class="s">every statistic re-derivable from raw samples via <span class="mono">armsmith verify</span>.</p>
+      </div>
+    </div>
+
+    <div class="refuse-card reveal">
+      <h3>What we <span>refuse to claim</span> (yet)</h3>
+      <ul class="refuse-list">
+        <li><span class="m" aria-hidden="true">○</span><span>Live Graviton throughput multiplier — <b>not yet measured</b>. It ships when real hardware measures it, and not one second before.<span class="tag">[PENDING]</span></span></li>
+        <li><span class="m" aria-hidden="true">●</span><span>All replay data is <b>synthetic</b> — labeled <code class="mono">"synthetic": true</code> at every layer; every loader refuses unlabeled measurement data.<span class="tag">by design</span></span></li>
+        <li><span class="m" aria-hidden="true">○</span><span>Live perf/PMU capture · llama-bench · PR posting · the Claude planner loop — deferred, marked in code, exit non-zero instead of faking output.<span class="tag">TODO(S1)</span></span></li>
+      </ul>
+      <p class="refuse-foot">Anything that isn&rsquo;t on the receipts doesn&rsquo;t get claimed. <b>That discipline is the product.</b></p>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §05 artifacts · element 7 ══════════════ -->
+<section id="artifacts" aria-labelledby="artifactsTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§05 · the artifacts</p>
+      <div>
+        <h2 id="artifactsTitle">Built to be taken.</h2>
+        <p class="lead">Every piece works standalone of the CLI — migration knowledge for the whole
+        x86&nbsp;→&nbsp;Arm community, not just this repo.</p>
+      </div>
+    </div>
+    <div class="bento">
+      <div class="bcard b-wide reveal">
+        <p class="k">migration templates</p>
+        <h3>13 x86 → Arm migration templates</h3>
+        <p><code>armsmith rules export --format md</code> renders one card per rule — anti-pattern · fix ·
+        citation — reusable on any repo. Add a 14th rule by dropping one YAML descriptor into the pack;
+        zero core changes.</p>
+        <div class="rules-grid" aria-label="The 13 aarch64 anti-pattern rules">
+          <span class="rule"><b>R1</b><span>amd64 pin → QEMU</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R2</b><span>no -mcpu/-march</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R3</b><span>reference BLAS</span></span>
+          <span class="rule"><b>R4</b><span>silent float64</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R5</b><span>GGUF quant ↔ ISA</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R6</b><span>threads × workers</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R7</b><span>ORT defaults</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R8</b><span>pip sdist fallback</span></span>
+          <span class="rule"><b>R9</b><span>memcpy storm</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R10</b><span>no KleidiAI build</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R11</b><span>THP / allocator</span></span>
+          <span class="rule"><b>R12</b><span>amd64-only CI</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+          <span class="rule"><b>R13</b><span>serving overhead</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
+        </div>
+        <p class="rules-legend"><span class="lp" aria-hidden="true"></span> cites an Arm Learning Path — 10 of 13; the rest cite the canonical upstream doc.</p>
+      </div>
+      <div class="bcard reveal">
+        <p class="k">public schema</p>
+        <h3>Signed-report JSON schema</h3>
+        <p><code>report.schema.json</code> — JSON Schema draft 2020-12, CI-validated. Build your own
+        viewer or CI gate against it without trusting our rendering.</p>
+      </div>
+      <div class="bcard reveal d1">
+        <p class="k">importable modules</p>
+        <h3>The methodology, as a library</h3>
+        <p><code>from armsmith.benchstats import compare</code> — plus <code>gate</code>, <code>report</code>
+        and <code>witness</code>. Median-of-N / MAD / noise-band statistics with no CLI required.</p>
+      </div>
+      <div class="bcard reveal d2">
+        <p class="k">drop-in ci gate</p>
+        <h3>arm64 CI action</h3>
+        <p>A composite GitHub Action (<code>action.yml</code>) runs the same reproduce gate on free
+        native-arm64 hosted runners (<code>ubuntu-24.04-arm</code>) as an exit-code perf-regression twin.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §06 quickstart ══════════════ -->
+<section id="quickstart" class="sec-alt" aria-labelledby="qsTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§06 · run the proof</p>
+      <div>
+        <h2 id="qsTitle">Two minutes. Zero Arm hardware. Zero trust required.</h2>
+        <p class="lead">Every command below runs on any x86 laptop — no Arm box, no network beyond
+        <code class="mono">pip</code>. All exit 0. The tamper step goes red on purpose.</p>
+      </div>
+    </div>
+
+    <figure class="qs-card reveal">
+      <div class="term">
+        <div class="term-hd">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="t">judge quickstart — zero hardware (~2 min)</span>
+        </div>
+<pre id="qsCode"><span class="cmd">git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith</span>
+<span class="cmd">python -m venv .venv &amp;&amp; source .venv/bin/activate</span>
+<span class="cmd">pip install -e '.[dev]'</span>
+
+<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 219 passing, fully offline</span>
+<span class="cmd">armsmith scan fixtures/replays/scenario_ragserve</span>               <span class="c"># static R1/R4/R12 — zero hardware</span>
+<span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>  <span class="c"># full gate: 4 kept, 2 dropped</span>
+<span class="cmd">armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt</span>  <span class="c"># ISA proof: 0 → 4 dotprod</span>
+<span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span> <span class="c"># → <span class="k">VERIFY OK</span></span>
+<span class="cmd">armsmith ci --replay fixtures/replays/scenario_ragserve</span>        <span class="c"># → <span class="k">CI GATE PASSED</span></span>
+<span class="cmd">python scripts/verify_offline.py</span>                               <span class="c"># → <span class="k">ALL CHECKS PASSED</span> — honest &amp; offline</span></pre>
+      </div>
+      <button class="copy-btn" type="button" id="copyQs" aria-label="Copy the quickstart commands">copy</button>
+    </figure>
+
+    <div class="tamper reveal d1">
+      <div>
+        <h3>Then try to cheat: <span>the 20-second trust proof</span></h3>
+        <p>Open <code class="mono">report.json</code>, change one digit in any <code class="mono">samples</code>
+        array, re-run <code class="mono">armsmith verify</code>. The arithmetic is independently re-derivable —
+        editing a number without re-running the measurement is detectable.</p>
+      </div>
+      <div class="term">
+        <div class="term-hd">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="t">tamper test</span>
+        </div>
+<pre><span class="p">$</span> <span class="cmd">vi fixtures/replays/scenario_ragserve/report.json</span>  <span class="c"># one digit</span>
+<span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
+  <span class="d">VERIFY FAILED</span></pre>
+      </div>
+    </div>
+
+    <p class="arm-note reveal d2"><b>On native Arm64</b> — Graviton <code>c7g</code>/<code>c8g</code>, Ampere, Axion,
+    or a GitHub <code>ubuntu-24.04-arm</code> runner — the same commands run identically, and
+    <code>armsmith doctor --offline</code> shows the host&rsquo;s dotprod / i8mm / SVE routing. CI already runs the
+    full suite on a native-arm64 + x86 matrix. Live capture (<code>--target ssh://…</code>) is the S1 path;
+    Armsmith never fabricates a hardware number.</p>
+  </div>
+</section>
+
+<!-- ══════════════ §07 faq · element 9 ══════════════ -->
+<section id="faq" aria-labelledby="faqTitle">
+  <div class="wrap">
+    <div class="ruler" aria-hidden="true"></div>
+    <div class="sec-head reveal">
+      <p class="sec-no mono">§07 · faq</p>
+      <div>
+        <h2 id="faqTitle">Honest answers.</h2>
+        <p class="lead">The same standard as the tool: if it isn&rsquo;t provable, it isn&rsquo;t claimed.</p>
+      </div>
+    </div>
+    <div class="faq reveal">
+      <details>
+        <summary><span class="qno mono">Q1</span>Do I need Arm hardware to validate any of this?</summary>
+        <div class="a"><p>No. The judge quickstart runs on any x86 laptop in about two minutes, fully offline
+        beyond <code>pip</code>: 219 tests, the static scan, the full replay reproduce gate, the ISA witness,
+        <code>verify</code>, and the CI twin — all exit 0 with no Arm box and no network.</p></div>
+      </details>
+      <details>
+        <summary><span class="qno mono">Q2</span>Are the performance numbers real hardware measurements?</summary>
+        <div class="a"><p>No — and the tool is built so that can&rsquo;t be fudged. Every number in the repo today
+        comes from replay bundles labeled <code>"synthetic": true</code> at every layer; loaders refuse unlabeled
+        measurement data. The live Graviton multiplier is <b>[PENDING]</b> until a real capture lands. What
+        <em>is</em> real today: the gate math, the drop behavior, the signatures, and the
+        <code>0 → 4</code> dotprod ISA witness — all deterministic and re-runnable.</p></div>
+      </details>
+      <details>
+        <summary><span class="qno mono">Q3</span>What happens to a fix that can&rsquo;t be proven?</summary>
+        <div class="a"><p>The tool deletes it and says so. On the <code>ragserve</code> seed, 6 candidate fixes
+        entered the reproduce gate; 4 survived, 1 was refused for landing inside the noise band and 1 for an
+        output-hash mismatch. Refusals ship in the report and the PR body — never hidden.</p></div>
+      </details>
+      <details>
+        <summary><span class="qno mono">Q4</span>Can&rsquo;t I just edit the report to a nicer number?</summary>
+        <div class="a"><p>Try it — that&rsquo;s the 20-second demo. <code>report.json</code> embeds the raw samples
+        beside every statistic; <code>armsmith verify</code> recomputes every stat and gate verdict from those
+        samples. Change one digit and it prints <b>VERIFY FAILED</b>.</p></div>
+      </details>
+      <details>
+        <summary><span class="qno mono">Q5</span>What can I reuse without adopting the CLI?</summary>
+        <div class="a"><p>Four artifacts: the 13 x86 → Arm migration templates (10 citing Arm Learning Paths),
+        the public signed-report JSON schema (draft 2020-12, CI-validated), the importable
+        <code>benchstats</code> / <code>gate</code> / <code>report</code> / <code>witness</code> modules, and a
+        drop-in composite GitHub Action that runs the gate on free native-arm64 runners. A 14th rule is one
+        YAML descriptor — no core changes.</p></div>
+      </details>
+      <details>
+        <summary><span class="qno mono">Q6</span>License, track, and what&rsquo;s with the two names?</summary>
+        <div class="a"><p>MIT, end to end. Built for the <a href="https://arm-ai-optimization-challenge.devpost.com/">Arm
+        AI Optimization Challenge</a> on Devpost — Track 2, Cloud AI — where it&rsquo;s submitted under the product
+        name <b>Armsmith</b>. The tool, the CLI and this site are <b>Armsmith</b>: the agent that forges your
+        repo for Arm.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════ §08 final CTA · element 10 ══════════════ -->
+<section class="forge-cta" aria-labelledby="finalTitle">
+  <div class="wrap">
+    <div class="forge-plate reveal">
+      <p class="k">§08 · your move</p>
+      <h2 id="finalTitle">Try to fake <em>a number</em>.</h2>
+      <p>Clone the repo, tamper with the report, and watch <b>VERIFY FAILED</b> catch you in one second.
+      Then read the 13 migration templates and make your own repo fast on Arm.</p>
+      <div class="cta-row">
+        <a class="btn btn-forge" href="https://github.com/edycutjong/armsmith">Open the forge on GitHub <span class="arr" aria-hidden="true">↗</span></a>
+        <a class="btn btn-line" href="./deck.html">Pitch deck <span class="arr" aria-hidden="true">→</span></a>
+        <span class="btn disabled" aria-disabled="true" title="Demo video pending — the repo quickstart is the live proof meanwhile">Demo video · pending</span>
+      </div>
+      <p class="forge-meta"><span>MIT licensed</span><span>Track 2 · Cloud AI</span><a href="https://arm-ai-optimization-challenge.devpost.com/">Arm AI Optimization Challenge ↗</a></p>
+    </div>
+  </div>
+</section>
+</main>
+
+<!-- ══════════════ footer · element 11 ══════════════ -->
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <img src="./assets/icon.svg" alt="" aria-hidden="true" width="34" height="34">
+        <div>
+          <b class="mono">armsmith</b>
+          <p>The agent that forges your repo for Arm. The LLM proposes; only the reproduce gate can claim.</p>
+        </div>
+      </div>
+      <nav class="foot-col" aria-label="Project links">
+        <h3>Project</h3>
+        <ul>
+          <li><a href="https://github.com/edycutjong/armsmith">GitHub repository ↗</a></li>
+          <li><a href="./deck.html">Pitch deck</a></li>
+          <li><a href="https://arm-ai-optimization-challenge.devpost.com/">Devpost — Arm AI Optimization Challenge ↗</a></li>
+          <li><span class="dim">Demo video — pending</span></li>
+        </ul>
+      </nav>
+      <div class="foot-col">
+        <h3>Fine print</h3>
+        <ul>
+          <li><span class="dim">MIT license · submitted on Devpost as <b>Armsmith</b></span></li>
+          <li><span class="dim">219 tests · fully offline · ~93% line coverage</span></li>
+          <li><span class="dim">No hardware throughput claimed — live Graviton numbers are <code>[PENDING]</code></span></li>
+          <li><span class="dim">Replay data is synthetic and labeled at every layer</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bar">
+      <span>© 2026 Armsmith · built for the Arm AI Optimization Challenge — Track 2: Cloud AI</span>
+      <span class="ctr">proposed 6 · <span class="g">proven 4</span> · <span class="r">refused 2</span> · <span class="o">faked 0</span></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---- theme toggle ---- */
+  var root=document.documentElement;
+  var btn=document.getElementById('themeBtn');
+  function metaTheme(c){
+    document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.setAttribute('content',c);});
+  }
+  if(btn){
+    btn.addEventListener('click',function(){
+      var sysDark=false;
+      try{sysDark=window.matchMedia('(prefers-color-scheme: dark)').matches;}catch(e){}
+      var cur=root.getAttribute('data-theme')||(sysDark?'dark':'light');
+      var next=cur==='dark'?'light':'dark';
+      root.setAttribute('data-theme',next);
+      metaTheme(next==='dark'?'#0A100E':'#F7F4EE');
+      try{localStorage.setItem('theme',next);}catch(e){}
+    });
+  }
+
+  /* ---- sticky header state ---- */
+  var head=document.getElementById('siteHead');
+  var sentinel=document.getElementById('headSentinel');
+  if('IntersectionObserver' in window && head && sentinel){
+    new IntersectionObserver(function(entries){
+      head.classList.toggle('scrolled',!entries[0].isIntersecting);
+    },{rootMargin:'12px 0px 0px 0px'}).observe(sentinel);
+  }else if(head){
+    head.classList.add('scrolled');
+  }
+
+  /* ---- reading-progress line (rAF-throttled) ---- */
+  var progress=document.getElementById('progress');
+  if(progress){
+    var ticking=false;
+    var setProgress=function(){
+      var doc=document.documentElement;
+      var max=(doc.scrollHeight-doc.clientHeight)||1;
+      var p=Math.min(1,Math.max(0,(window.scrollY||doc.scrollTop||0)/max));
+      progress.style.setProperty('--p',p.toFixed(4));
+      ticking=false;
+    };
+    setProgress();
+    window.addEventListener('scroll',function(){
+      if(!ticking){ticking=true;window.requestAnimationFrame(setProgress);}
+    },{passive:true});
+    window.addEventListener('resize',setProgress,{passive:true});
+  }
+
+  /* ---- scroll-spy: highlight the nav link for the section in view ---- */
+  var navLinks=[].slice.call(document.querySelectorAll('.site-nav a[href^="#"]'));
+  if(navLinks.length && 'IntersectionObserver' in window){
+    var linkFor={};
+    var spyTargets=[];
+    navLinks.forEach(function(a){
+      var id=a.getAttribute('href').slice(1);
+      var sec=document.getElementById(id);
+      if(sec){linkFor[id]=a;spyTargets.push(sec);}
+    });
+    var visible={};
+    var setActive=function(id){
+      navLinks.forEach(function(a){
+        var on=a===linkFor[id];
+        a.classList.toggle('active',on);
+        if(on){a.setAttribute('aria-current','true');}else{a.removeAttribute('aria-current');}
+      });
+    };
+    var spy=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        visible[en.target.id]=en.isIntersecting?en.intersectionRatio:0;
+      });
+      var bestId=null,best=0;
+      spyTargets.forEach(function(sec){
+        var v=visible[sec.id]||0;
+        if(v>best){best=v;bestId=sec.id;}
+      });
+      if(bestId){setActive(bestId);}
+    },{rootMargin:'-40% 0px -50% 0px',threshold:[0,.25,.5,1]});
+    spyTargets.forEach(function(sec){spy.observe(sec);});
+  }
+
+  /* ---- reveal on scroll ---- */
+  var reveals=document.querySelectorAll('.reveal');
+  var reduce=false;
+  try{reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+  if(!('IntersectionObserver' in window)||reduce){
+    reveals.forEach(function(el){el.classList.add('in');});
+  }else{
+    var io=new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        /* reveal when entering view — or already above it (deep links, fast scrolls) */
+        if(en.isIntersecting||en.boundingClientRect.top<0){
+          en.target.classList.add('in');io.unobserve(en.target);
+        }
+      });
+    },{threshold:0,rootMargin:'0px 0px -5% 0px'});
+    reveals.forEach(function(el){io.observe(el);});
+    /* safety net: after scrolling stops, reveal anything at or above the viewport
+       (covers flick-scrolls that teleport elements past the viewport between paints) */
+    var idleT;
+    window.addEventListener('scroll',function(){
+      clearTimeout(idleT);
+      idleT=setTimeout(function(){
+        reveals.forEach(function(el){
+          if(!el.classList.contains('in')&&el.getBoundingClientRect().top<window.innerHeight){
+            el.classList.add('in');io.unobserve(el);
+          }
+        });
+      },160);
+    },{passive:true});
+  }
+
+  /* ---- copy quickstart ---- */
+  var copyBtn=document.getElementById('copyQs');
+  var code=document.getElementById('qsCode');
+  if(copyBtn&&code){
+    copyBtn.addEventListener('click',function(){
+      var text=code.innerText;
+      function done(ok){
+        copyBtn.textContent=ok?'copied ✓':'select + copy';
+        copyBtn.setAttribute('aria-label',ok?'Quickstart commands copied to clipboard':'Copy failed — select the commands and copy manually');
+        copyBtn.classList.toggle('ok',ok);
+        setTimeout(function(){copyBtn.textContent='copy';copyBtn.setAttribute('aria-label','Copy the quickstart commands');copyBtn.classList.remove('ok');},1800);
+      }
+      function legacyCopy(){
+        try{
+          var ta=document.createElement('textarea');
+          ta.value=text;ta.setAttribute('readonly','');
+          ta.style.position='absolute';ta.style.left='-9999px';
+          document.body.appendChild(ta);ta.select();
+          var ok=document.execCommand('copy');
+          document.body.removeChild(ta);done(ok);
+        }catch(e){done(false);}
+      }
+      if(navigator.clipboard&&navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(function(){done(true);},legacyCopy);
+      }else{
+        legacyCopy();
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>
