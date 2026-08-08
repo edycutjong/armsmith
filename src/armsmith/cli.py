@@ -6,6 +6,7 @@ Commands:
   witness <before> <after>     ISA-witness: count SDOT/UDOT/SMMLA/USMMLA before vs after
   pr <report.json>             assemble the bot PR (dry-run); live posting is TODO(S1)
   ci --replay <bundle>         reproduce-gate as an exit-code CI twin (fails on regression)
+  bench-live                   LIVE gate on real Arm silicon: compile A/B, witness SDOT, measure
   rules list | rules explain   the 13-rule pack with citations
   verify <report.json>         hash + ed25519 + recompute-stats verification
   keys init                    generate the local ed25519 signing keypair
@@ -427,6 +428,169 @@ def ci(
         err_console.print("CI GATE FAILED — performance regression detected")
         raise typer.Exit(code=1)
     console.print("[bold green]CI GATE PASSED[/bold green] — no regression outside the noise band")
+
+
+# ---------------------------------------------------------------------------
+# bench-live
+# ---------------------------------------------------------------------------
+
+@app.command("bench-live")
+def bench_live(
+    out: Path = typer.Option(Path("report-live.json"), "--out", "-o", help="Report output path."),
+    markdown: Path | None = typer.Option(None, "--markdown", help="Also write the evidence markdown here."),
+    n: int = typer.Option(8192, "--n", min=256, help="Kernel vector length (int8 elements)."),
+    reps: int = typer.Option(50000, "--reps", min=100, help="Kernel iterations per run."),
+    rounds: int = typer.Option(7, "--rounds", min=3, help="Measured rounds per variant."),
+    warmup: int = typer.Option(2, "--warmup", min=0, help="Discarded warmup rounds per variant."),
+    instance: str = typer.Option("unknown", "--instance", help="Host label recorded in the report."),
+    sign: bool = typer.Option(True, "--sign/--no-sign", help="ed25519-sign the report."),
+    key_dir: Path | None = typer.Option(None, "--key-dir", help="Key directory (default ~/.armsmith)."),
+    require_witness: bool = typer.Option(
+        False, "--require-witness",
+        help="Exit non-zero if the candidate build emits no SDOT/UDOT/SMMLA/USMMLA.",
+    ),
+) -> None:
+    """LIVE reproduce gate on real Arm silicon — no replay, no fixtures.
+
+    Compiles bench/int8_dot.c twice from one source (generic ARMv8.0 vs
+    ARMv8.2+dotprod — exactly what rule R2 flags), witnesses the SDOT
+    instructions in each binary with objdump, ABAB-interleaves the timed runs,
+    and puts the result through the same gate as every replay bundle. Refuses to
+    run on non-Arm hardware."""
+    from . import report as report_mod
+    from .evidence import render_markdown
+    from .fingerprint import capture_fingerprint
+    from .gate import GateConfig, run_gate
+    from .keys import KeyError_
+    from .livebench import METRIC, ToolchainError, run_live_bench
+    from .probes import LiveProbe
+    from .witness import witness_delta
+
+    try:
+        res = run_live_bench(n=n, reps=reps, measured_rounds=rounds, warmup=warmup)
+    except (ToolchainError, ValueError) as exc:
+        err_console.print(f"live bench failed: {exc}")
+        raise typer.Exit(code=2)
+
+    console.print(
+        f"[bold green]LIVE MODE[/bold green] — measured on this host "
+        f"({res.toolchain.machine}/{res.toolchain.system}). Nothing below is synthetic."
+    )
+
+    # --- host fingerprint from a REAL lscpu -------------------------------
+    probe = LiveProbe("local")
+    probe.capture("objdump_before", res.baseline.disassembly)
+    probe.capture("objdump_after", res.candidate.disassembly)
+    host = None
+    if probe.has("lscpu"):
+        host = capture_fingerprint(
+            probe, {"instance": instance, "kernel": res.toolchain.kernel}
+        )
+        ht = Table(title="Host (live lscpu)")
+        ht.add_column("field")
+        ht.add_column("value", overflow="fold")
+        ht.add_row("model", host.model_name)
+        ht.add_row("arch", host.architecture)
+        ht.add_row("cpus", str(host.cpus))
+        ht.add_row("ISA features", ", ".join(host.isa.present()) or "—")
+        ht.add_row("compiler", res.toolchain.cc_version)
+        console.print(ht)
+
+    # --- ISA witness: real objdump of both real binaries -------------------
+    wt = Table(title=f"ISA-witness — {res.baseline.spec.name} vs {res.candidate.spec.name}")
+    wt.add_column("mnemonic")
+    wt.add_column("baseline", justify="right")
+    wt.add_column("candidate", justify="right")
+    for mnemonic in sorted(set(res.baseline.witness.counts) | set(res.candidate.witness.counts)):
+        wt.add_row(
+            mnemonic,
+            str(res.baseline.witness.counts.get(mnemonic, 0)),
+            str(res.candidate.witness.counts.get(mnemonic, 0)),
+        )
+    wt.add_row(
+        "[bold]instructions scanned[/bold]",
+        str(res.baseline.witness.instructions_scanned),
+        str(res.candidate.witness.instructions_scanned),
+    )
+    console.print(wt)
+    for line in witness_delta(res.baseline.witness, res.candidate.witness):
+        console.print(f"  {line}")
+
+    # --- the gate: same code path, same refuse-to-claim rule ---------------
+    cfg = GateConfig(primary_metrics=(METRIC,))
+    outcome = run_gate(
+        res.baseline.to_measurement(), [res.candidate.to_measurement()], cfg
+    )
+    fix = outcome.results[0]
+    cmp = fix.comparisons.get(METRIC)
+
+    gt = Table(title="Reproduce gate (live)")
+    gt.add_column("field")
+    gt.add_column("value", overflow="fold")
+    if cmp:
+        gt.add_row("baseline median", f"{cmp.baseline.median:.6f} s")
+        gt.add_row("candidate median", f"{cmp.candidate.median:.6f} s")
+        gt.add_row("Δ", f"{cmp.delta:+.6f} s" + (f" ({cmp.delta_pct:+.2f}%)" if cmp.delta_pct is not None else ""))
+        gt.add_row("noise band", f"±{cmp.band:.6f} s (k={cmp.band_k:g})")
+        gt.add_row("verdict", cmp.verdict.value)
+    gt.add_row("outputs identical", "yes" if res.outputs_agree else "NO")
+    color = "green" if fix.verdict == "keep" else "red"
+    gt.add_row("gate", f"[{color}]{fix.verdict}[/{color}]")
+    console.print(gt)
+    for reason in fix.reasons:
+        console.print(f"  • {escape(reason)}")
+
+    # --- report ------------------------------------------------------------
+    evidence = [
+        f"baseline built with: {' '.join(res.baseline.compile_command)}",
+        f"candidate built with: {' '.join(res.candidate.compile_command)}",
+        f"dotprod instructions in {res.baseline.spec.name}: {res.baseline.witness.dotprod}"
+        f" → {res.candidate.spec.name}: {res.candidate.witness.dotprod}",
+    ]
+    finding = {
+        "rule_id": "R2",
+        "status": "matched",
+        "evidence": evidence,
+        "locations": ["bench/int8_dot.c"],
+        "fix": None,
+        "skipped_reason": None,
+    }
+    rpt = report_mod.build_report(
+        mode="live",
+        scenario="live-int8-dot-r2",
+        repo={"url": "https://github.com/edycutjong/armsmith", "sha": "bench/int8_dot.c"},
+        host=host,
+        findings=[finding],
+        outcome=outcome,
+        gate_config=cfg,
+        plan=[{"rule_id": "R2", "reason": "live A/B of the -march flag R2 flags"}],
+        artifacts=res.artifacts_dict(),
+        cost={"cost_usd": 0.0, "note": "measured on a GitHub-hosted arm64 runner — no direct spend"},
+    )
+
+    sign_note = None
+    if sign:
+        try:
+            rpt = report_mod.sign_report(rpt, key_dir=key_dir)
+        except KeyError_ as exc:
+            sign_note = f"report left unsigned: {exc}"
+    report_mod.write_report(rpt, out)
+    sig = rpt.get("signature")
+    if sig:
+        console.print(f"report → {out}  [green]signed[/green] sha256:{sig['report_sha256'][:16]}…")
+    else:
+        console.print(f"report → {out}  [yellow]UNSIGNED[/yellow] ({sign_note or 'signing disabled'})")
+
+    if markdown:
+        markdown.write_text(render_markdown(rpt), encoding="utf-8")
+        console.print(f"evidence → {markdown}")
+
+    if require_witness and res.candidate.witness.total == 0:
+        err_console.print(
+            "no witness instructions in the candidate build — this toolchain did "
+            "not emit SDOT/UDOT/SMMLA/USMMLA, so the R2 premise is unproven here"
+        )
+        raise typer.Exit(code=1)
 
 
 # ---------------------------------------------------------------------------

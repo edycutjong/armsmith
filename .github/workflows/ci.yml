@@ -69,6 +69,53 @@ jobs:
           .venv/bin/pip-audit --skip-editable
         continue-on-error: true
 
-  # TODO(S1): live-bench job on the arm64 runners — hyperfine/llama-bench
-  # measured legs, cosign keyless attestation of report.json (OIDC), and the
-  # noise-floor study matrix across both arm labels.
+  # ── The live leg: a REAL Arm measurement, not a replay ────────────────
+  # Compiles bench/int8_dot.c twice from one source (generic ARMv8.0 vs
+  # ARMv8.2+dotprod — the exact flag rule R2 flags), disassembles both binaries
+  # to count SDOT, ABAB-interleaves the timed runs, and puts the samples through
+  # the same reproduce gate as every replay bundle. Runs on native arm64 because
+  # there is nowhere else it *can* honestly run.
+  live-bench:
+    name: "Live Arm reproduce gate (native arm64)"
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e '.[dev]'
+      - name: Toolchain provenance (recorded into the report)
+        run: |
+          gcc --version | head -1
+          objdump --version | head -1
+          lscpu | sed -n '1,12p'
+      - name: Signing key for this run
+        run: .venv/bin/armsmith keys init
+      - name: Live A/B on real Arm silicon
+        run: |
+          .venv/bin/armsmith bench-live \
+            --instance "github-hosted:ubuntu-24.04-arm" \
+            --out report-live.json \
+            --markdown live-evidence.md \
+            --require-witness
+      - name: Verify the live report (hash + ed25519 + schema + recompute)
+        run: .venv/bin/armsmith verify report-live.json
+      - name: Publish the evidence to the run summary
+        if: always()
+        run: |
+          if [ -f live-evidence.md ]; then cat live-evidence.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload the signed live report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: armsmith-live-report-arm64
+          path: |
+            report-live.json
+            live-evidence.md
+
+  # TODO(S1): the remaining live instruments — hyperfine/llama-bench legs,
+  # cosign keyless attestation of report.json (OIDC), and the noise-floor study
+  # matrix across both arm labels.

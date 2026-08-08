@@ -10,10 +10,13 @@ directly.  They ask a :class:`Probe` for a named observation ("lscpu",
   bundles that don't declare provenance.  Everything shipped in this repo's
   ``fixtures/replays/`` is synthetic, hand-authored, and labeled as such —
   no fabricated hardware claims.
-* **LiveProbe (TODO(S1))** — will execute the real instruments (lscpu, perf,
-  llama-bench, hyperfine, pip, cmake) on Arm hardware over SSH.  Not
-  implemented here: this machine is not an Arm/Linux target and Armsmith
-  never invents measurements.
+* **LiveProbe** — executes real instruments on the Arm host it runs on.
+  Implemented for what can be observed honestly today (``lscpu``, THP state,
+  plus harness-captured disassembly for the ISA witness); every other kind
+  raises ``ProbeMissing`` instead of inventing an answer, and ``env`` /
+  ``proc_maps`` are refused outright so a published report can never carry CI
+  secrets or host paths.  Remote (``ssh://``) targets and the remaining
+  instruments (perf, llama-bench, hyperfine, pip, cmake) are TODO(S1).
 
 Replay bundle layout::
 
@@ -42,6 +45,9 @@ Replay bundle layout::
 from __future__ import annotations
 
 import json
+import platform
+import shutil
+import subprocess
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
@@ -55,6 +61,9 @@ __all__ = [
     "ReplayManifest",
     "load_manifest",
     "PROBE_KINDS",
+    "LIVE_COMMANDS",
+    "LIVE_FILES",
+    "LIVE_REFUSED",
 ]
 
 #: Known probe kinds → the file that backs them in a replay bundle.
@@ -203,33 +212,116 @@ class ReplayProbe(Probe):
         return {p.stem: p for p in sorted(bench.glob("*.json"))}
 
 
-class LiveProbe(Probe):
-    """Executes real instruments on Arm hardware. NOT implemented in Phase 1.
+#: Probe kinds LiveProbe can genuinely observe by running a command on this
+#: host, mapped to that command. Deliberately short: a kind belongs here only
+#: when local execution answers it *truthfully and safely*.
+LIVE_COMMANDS: dict[str, list[str]] = {
+    "lscpu": ["lscpu"],
+}
 
-    TODO(S1): implement against a Graviton target (local exec + ssh://),
-    shelling out to lscpu / perf / llama-bench / hyperfine / pip / cmake and
-    recording raw outputs so every live run can be replayed later
-    (scripts/record_replays.sh writes the same bundle layout ReplayProbe reads).
+#: Files LiveProbe reads directly rather than shelling out for.
+LIVE_FILES: dict[str, str] = {
+    "thp": "/sys/kernel/mm/transparent_hugepage/enabled",
+}
+
+#: Kinds LiveProbe will never self-serve, with the reason. ``env`` and
+#: ``proc_maps`` are refused on PURPOSE: a report is a published artifact, and
+#: a CI environment block contains tokens. Armsmith does not put the machine's
+#: environment into a file it asks the world to trust.
+LIVE_REFUSED: dict[str, str] = {
+    "env": "environment dumps can carry CI secrets — never captured into a report",
+    "proc_maps": "process maps leak host paths and add nothing a report can use",
+}
+
+
+class LiveProbe(Probe):
+    """Executes real instruments on the local host (Arm silicon, live mode).
+
+    Scope is deliberately narrow. This backend answers only what it can observe
+    honestly right now — ``lscpu`` and transparent-hugepage state — plus
+    observations a harness hands it via :meth:`capture` (e.g. the objdump text
+    :mod:`armsmith.livebench` produces for the ISA witness). Every other probe
+    kind raises :class:`ProbeMissing` rather than inventing a plausible answer;
+    "skip, don't guess" is the same rule the rule pack follows.
+
+    TODO(S1): ``ssh://`` targets and the remaining instruments (perf,
+    llama-bench, hyperfine, pip, cmake), plus ``scripts/record_replays.sh`` to
+    write live captures back out in the bundle layout ReplayProbe reads.
     """
 
     def __init__(self, target: str = "local"):
-        raise NotImplementedError(
-            "LiveProbe requires Arm/Linux hardware and lands at S1 — "
-            "use ReplayProbe with a recorded bundle (armsmith diagnose --replay)"
-        )
+        if target != "local":
+            raise NotImplementedError(
+                f"LiveProbe target {target!r} is not supported — remote (ssh://) "
+                "targets land at S1; run armsmith on the Arm host itself"
+            )
+        self.target = target
+        self._captured: dict[str, str] = {}
+        self._cache: dict[str, str] = {}
 
-    def has(self, kind: str) -> bool:  # pragma: no cover - unreachable
-        raise NotImplementedError
+    def capture(self, kind: str, text: str) -> None:
+        """Record a real observation produced by a harness on this host.
 
-    def text(self, kind: str) -> str:  # pragma: no cover - unreachable
-        raise NotImplementedError
+        Used for probe kinds that only exist relative to something built during
+        the run — the ISA witness's ``objdump_before``/``objdump_after``.
+        """
+        if kind not in PROBE_KINDS:
+            raise ProbeMissing(f"unknown probe kind {kind!r}")
+        self._captured[kind] = text
 
-    def json(self, kind: str) -> Any:  # pragma: no cover - unreachable
-        raise NotImplementedError
+    def _read(self, kind: str) -> str | None:
+        if kind in self._captured:
+            return self._captured[kind]
+        if kind in self._cache:
+            return self._cache[kind]
+        if kind in LIVE_FILES:
+            path = Path(LIVE_FILES[kind])
+            if not path.is_file():
+                return None
+            value = path.read_text(encoding="utf-8")
+            self._cache[kind] = value
+            return value
+        if kind in LIVE_COMMANDS:
+            exe = shutil.which(LIVE_COMMANDS[kind][0])
+            if not exe:
+                return None
+            proc = subprocess.run(
+                [exe, *LIVE_COMMANDS[kind][1:]],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+            if proc.returncode != 0:
+                return None
+            self._cache[kind] = proc.stdout
+            return proc.stdout
+        return None
 
-    def raw(self, kind: str) -> bytes:  # pragma: no cover - unreachable
-        raise NotImplementedError
+    def has(self, kind: str) -> bool:
+        if kind not in PROBE_KINDS or kind in LIVE_REFUSED:
+            return False
+        return self._read(kind) is not None
+
+    def text(self, kind: str) -> str:
+        if kind not in PROBE_KINDS:
+            raise ProbeMissing(f"unknown probe kind {kind!r}")
+        if kind in LIVE_REFUSED:
+            raise ProbeMissing(f"probe {kind!r} refused in live mode: {LIVE_REFUSED[kind]}")
+        value = self._read(kind)
+        if value is None:
+            raise ProbeMissing(
+                f"probe {kind!r} is not available from a live local run — "
+                "the live instrument for it lands at S1 (skip, don't guess)"
+            )
+        return value
+
+    def json(self, kind: str) -> Any:
+        return json.loads(self.text(kind))
+
+    def raw(self, kind: str) -> bytes:
+        return self.text(kind).encode("utf-8")
 
     @property
-    def source(self) -> str:  # pragma: no cover - unreachable
-        raise NotImplementedError
+    def source(self) -> str:
+        return f"live[{platform.system()}/{platform.machine()}]: {platform.node()}"

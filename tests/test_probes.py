@@ -80,6 +80,39 @@ def test_source_label_propagates(scenario_bundle):
     assert probe.source.startswith("replay[SYNTHETIC]")
 
 
-def test_live_probe_refuses_in_phase1():
+def test_live_probe_refuses_remote_targets():
+    """Local execution is implemented; ssh:// targets still land at S1."""
     with pytest.raises(NotImplementedError, match="S1"):
-        LiveProbe()
+        LiveProbe("ssh://graviton")
+
+
+def test_live_probe_refuses_env_and_proc_maps():
+    """A published report must never carry CI secrets or host paths."""
+    probe = LiveProbe("local")
+    for kind, needle in (("env", "secrets"), ("proc_maps", "leak")):
+        assert probe.has(kind) is False
+        with pytest.raises(ProbeMissing, match=needle):
+            probe.text(kind)
+
+
+def test_live_probe_skips_rather_than_guesses():
+    probe = LiveProbe("local")
+    with pytest.raises(ProbeMissing, match="S1"):
+        probe.text("llama_bench")
+
+
+def test_live_probe_rejects_unknown_kind():
+    probe = LiveProbe("local")
+    with pytest.raises(ProbeMissing, match="unknown probe kind"):
+        probe.capture("not_a_probe", "text")
+
+
+def test_live_probe_serves_captured_observations():
+    probe = LiveProbe("local")
+    probe.capture("objdump_before", "  400: 4e809c02 \tsdot\tv2.4s, v0.16b, v0.4b[0]\n")
+    assert probe.has("objdump_before") is True
+    assert "sdot" in probe.text("objdump_before")
+
+
+def test_live_probe_source_is_labeled_live():
+    assert LiveProbe("local").source.startswith("live[")

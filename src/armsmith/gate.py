@@ -47,6 +47,7 @@ __all__ = [
 #: direction in GateConfig.directions — the gate refuses to guess.
 METRIC_DIRECTIONS: dict[str, Direction] = {
     "wall_s": Direction.LOWER_BETTER,
+    "kernel_s": Direction.LOWER_BETTER,   # in-process kernel timing (livebench)
     "wall_p50_s": Direction.LOWER_BETTER,
     "wall_p95_s": Direction.LOWER_BETTER,
     "latency_ms": Direction.LOWER_BETTER,
