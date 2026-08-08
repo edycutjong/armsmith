@@ -21,7 +21,7 @@ jobs:
     name: "Secret scanning (TruffleHog)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # full history so rotated/committed secrets are caught
       - name: TruffleHog verified-secret scan
@@ -42,7 +42,7 @@ jobs:
         python-version: ["3.11", "3.12"]
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
@@ -79,7 +79,7 @@ jobs:
     name: "Live Arm reproduce gate (native arm64)"
     runs-on: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
