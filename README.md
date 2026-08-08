@@ -4,13 +4,27 @@
   <p><em>The agent that forges your repo for Arm.</em></p>
   <img src="docs/readme-hero-animated.svg" alt="Armsmith — the agent that forges your repo for Arm" width="100%">
 
+  <p>
+    <strong>On a GitHub <code>ubuntu-24.04-arm</code> runner (Neoverse-N2), Armsmith measured its own
+    R2 fix at <code>SDOT 0 → 1</code> and <code>−86.5%</code> kernel time — then signed the report and
+    re-derived every statistic from the raw samples.</strong><br/>
+    Reproduce it in ~2 minutes on any x86 laptop, no Arm hardware required:
+    <a href="#-getting-started">Getting Started</a>.
+  </p>
+
   <br/>
 
-  ![CI: arm64 + x86 matrix](https://img.shields.io/badge/CI-arm64%20%2B%20x86-brightgreen)
+  [![Live Demo](https://img.shields.io/badge/🚀_Live-Demo-06b6d4?style=for-the-badge)](https://armsmith.vercel.app)
+  [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://armsmith.vercel.app/deck.html)
+  [![Built for Arm AI Optimization Challenge](https://img.shields.io/badge/Devpost-Arm_AI_Challenge-8b5cf6?style=for-the-badge)](https://arm-ai-optimization-challenge.devpost.com/)
+
+  <br/>
+
+  [![CI](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml)
   ![234 tests passing](https://img.shields.io/badge/tests-234%20passing-brightgreen)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
-  ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-blue)
+  ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat&logo=python&logoColor=white)
   ![aarch64 native](https://img.shields.io/badge/arch-aarch64%20native-f7941e)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
 
 </div>
 
@@ -25,12 +39,29 @@ wins, and dropped fixes are reported, never hidden.
 **Status: hardware-free core + one live Arm leg.** `234` pytest tests, all green. The rule pack, the
 planner and the diagnose loop run against **replay bundles** — recorded/synthetic instrument outputs
 labeled `"synthetic": true` at every layer and refused by every loader when unlabeled. Exactly one
-path produces real hardware numbers, `armsmith bench-live` ([see below](#-measured-on-real-arm-silicon)),
+path produces real hardware numbers, `armsmith bench-live` ([see below](#measured-on-real-arm-silicon)),
 and its reports carry `"mode": "live"`, `"synthetic": false`. **Every number in this repo is one or the
 other, and says which.** The remaining live instruments (perf/PMU, Performix, llama-bench, hyperfine,
 cosign-in-CI, the Claude planner loop, PR posting) land at S1 and are marked `TODO(S1)` in code.
 
-## 🔁 The Loop
+## 💡 The Problem & Solution
+
+### The Problem
+
+Moving an AI workload from x86 to Arm is supposed to be a cost win, and usually it is — but when a
+repo runs slowly on aarch64, nobody can tell you *why*. The failure modes are boring and invisible:
+an amd64-pinned base image quietly running under QEMU, NumPy on reference BLAS, a GGUF quantization
+that misses the ISA's repack path, a build with no `-mcpu` so the dot-product unit never gets used.
+
+The deeper problem is what happens next. An LLM is very willing to tell you it made your code 30%
+faster. Benchmarks are noisy, "improvements" inside the noise band get reported as wins, and a fix
+that changes your output is still a fix if nobody checked. Performance claims are the easiest thing
+in software to fake, including by accident.
+
+### The Solution
+
+Armsmith is an agent that is **not allowed to claim its own results**. It scans, it drafts fixes, and
+then every fix has to survive a reproduce gate that the agent does not control:
 
 ```
 armsmith diagnose ./repo
@@ -41,37 +72,14 @@ armsmith diagnose ./repo
    └─ signed report (ed25519 + sha256) ─→ PR body with evidence table (dry-run)
 ```
 
-## 🚀 Judge Quickstart — Zero Hardware (~2 min)
+A fix is kept only if it beats the measured noise band **and** produces byte-identical output. Fixes
+that fail are reported with reasons, never dropped silently. The report embeds the raw samples, so
+`armsmith verify` recomputes every statistic and every verdict independently — you never have to
+trust the number that was printed at you.
 
-Every command below runs on any x86 laptop — **no Arm hardware, no network** beyond `pip`. This is
-the primary "runnable by a judge" surface, because most judges have no Graviton box. All commands
-exit 0; the tamper step at the end goes red on purpose.
+## 🏗️ Architecture & Tech Stack
 
-```bash
-git clone https://github.com/edycutjong/armsmith && cd armsmith
-python -m venv .venv && source .venv/bin/activate
-pip install -e '.[dev]'
-
-python -m pytest -q                                            # 234 passing, fully offline
-armsmith scan fixtures/replays/scenario_ragserve               # static R1/R4/R12 on a real dir, zero hardware
-armsmith diagnose --replay fixtures/replays/scenario_ragserve  # full reproduce gate (4 kept, 2 dropped)
-armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt  # ISA proof: 0→4 dotprod
-armsmith verify fixtures/replays/scenario_ragserve/report.json # -> VERIFY OK (recomputes every stat)
-armsmith ci --replay fixtures/replays/scenario_ragserve        # -> CI GATE PASSED (exit-code CI twin)
-python scripts/verify_offline.py                               # -> ALL CHECKS PASSED — honest & offline
-```
-
-**The 20-second trust proof (whole pitch, zero hardware):** open
-`fixtures/replays/scenario_ragserve/report.json`, change one digit in any `samples` array, re-run
-`armsmith verify …/report.json` → red **`VERIFY FAILED`**. You never trust the printed number; the
-arithmetic is independently re-derivable and tamper-evident.
-
-Other surfaces: `armsmith rules list` · `armsmith rules explain R13` (fix + Arm Learning Path) ·
-`armsmith rules export --format md` (writes the 13 migration-template cards to `docs/migration-templates/`) ·
-`armsmith doctor --offline --replay fixtures/replays/scenario_ragserve` (host/ISA fingerprint) ·
-`armsmith pr fixtures/replays/scenario_ragserve/report.json` (renders the bot PR — dry-run).
-
-## 📋 The 13-Rule Pack
+### The 13-Rule Pack
 
 Every rule ships as a YAML descriptor (`src/armsmith/rules/packs/`) with a detector, a
 deterministic fix generator, a citation URL, and positive/negative fixtures. Expected-gain ranges
@@ -100,27 +108,85 @@ end-to-end wall time — >15% divergence means the pipeline, not the kernels, is
 Both instruments' self-reported stats are cross-checked against their own raw samples first;
 disagreement makes the rule refuse to diagnose.
 
-## 🔐 The Trust Story
+### Tech Stack
 
-1. **Statistics engine** (`armsmith.benchstats`) — median-of-N, MAD noise bands
-   (`k·√(smad_a²+smad_b²)`, k=3), p50/p95 by documented linear interpolation, ABAB interleave
-   planning, and a hard *refuse-to-claim-inside-band* rule.
-2. **Reproduce gate** (`armsmith.gate`) — drop on hash mismatch, drop on any out-of-band
-   regression, drop when nothing clears the band. Reasons are machine-readable and shipped.
-3. **Tamper-evident reports** (`armsmith.report`) — raw samples embedded next to every claimed
-   statistic; canonical-JSON sha256 content addressing; ed25519 signature; `armsmith verify`
-   *recomputes every statistic and gate verdict from the embedded samples*. Editing a number
-   without re-running the math is detectable. Schema: [`schema/report.schema.json`](schema/report.schema.json).
-4. **ISA witness** (`armsmith.witness`) — counts SDOT/UDOT/SMMLA/USMMLA in disassembly
-   before/after: wall-clock can be argued with; emitted instructions cannot.
-5. **PR evidence** (`armsmith.evidence`, `armsmith.ghpr`) — the
-   `| metric | before | after | Δ | noise band | PMU Δ |` table, the drop log, and the judge-facing
-   `cosign verify-blob` command line. PR module is **dry-run only** here: it renders exactly what
-   would be posted and never touches the network.
+| layer | choice | why |
+|---|---|---|
+| CLI | Typer + Rich | subcommand surface + the evidence tables judges actually read |
+| Statistics | **pure stdlib**, zero deps (`armsmith.benchstats`) | the math that accepts or rejects a claim must be auditable at a glance |
+| Rule descriptors | PyYAML | a 14th rule is one YAML file + one detector, no core changes |
+| Report signing | `cryptography` (ed25519) | tamper-evident reports; `verify` re-derives every statistic |
+| Report schema | `jsonschema` (draft 2020-12) | public contract, CI-validated — build your own viewer against it |
+| Live Arm bench | GCC + binutils `objdump` on aarch64 | compile A/B from one source, then count SDOT in the disassembly |
+| CI | GitHub Actions — `ubuntu-24.04-arm` · `ubuntu-22.04-arm` · `ubuntu-latest` × Py 3.11/3.12 | native arm64 legs, free, no hardware to rent |
+| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 234 tests, ~93% coverage |
 
-## 📐 Measured on Real Arm Silicon
+## 🏆 Arm Integration (Cloud AI Track)
 
-Everything above proves the loop is *honest*. This is where it stops being a replay.
+Armsmith is not an app that happens to run on Arm — Arm is the subject matter. The Arm-specific
+surfaces it actually uses:
+
+- **Native arm64 CI runners** — `ubuntu-24.04-arm` / `ubuntu-22.04-arm`, four green jobs per push,
+  plus a dedicated `live-bench` job that takes a **real measurement** on Neoverse-N2.
+- **ISA feature routing** — `lscpu` flags parsed into `dotprod / i8mm / SVE / SVE2 / BF16 / SME`, and
+  rules gate their advice on what the target CPU actually has.
+- **`-mcpu` / `-march` flag matrix (R2)** — the rule with a live, measured A/B behind it (below).
+- **Arm dot-product & int8-matmul ISA** — `armsmith.witness` counts `SDOT/UDOT/SMMLA/USMMLA` in real
+  disassembly, so a kernel claim is proven at the instruction level.
+- **GGUF + KleidiAI paths (R5, R10)** — a real GGUF header parser checks whether the chosen
+  quantization can reach the ISA's repack path; R10 checks whether llama.cpp was built with KleidiAI.
+- **Arm Learning Path citations** — every rule carries a real upstream URL; `armsmith rules export`
+  renders them as 13 migration cards.
+
+Armsmith is arch-clean Python and installs identically on `aarch64` (AWS Graviton `c7g`/`c8g`,
+Ampere, Axion, or a GitHub `ubuntu-24.04-arm` runner):
+
+```bash
+sudo apt-get update && sudo apt-get install -y python3-venv  # (perf, hyperfine, llama.cpp = live-mode, S1)
+git clone https://github.com/edycutjong/armsmith && cd armsmith
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
+python -m pytest -q                                                    # 234 passing on aarch64
+armsmith doctor --offline --replay fixtures/replays/scenario_ragserve  # shows dotprod/i8mm/SVE routing
+armsmith diagnose --replay fixtures/replays/scenario_ragserve          # identical loop, native arm64
+armsmith bench-live --require-witness                                  # the real measurement, on your silicon
+```
+
+The offline suite proves the package is arch-clean on real Arm silicon, and `bench-live` takes a
+genuine measurement on it. Full **live capture** — driving `perf`/`hyperfine`/`llama-bench` against
+*your* workload and recording a real before/after — is the S1 path
+(`armsmith diagnose <repo> --target ssh://…`, `LiveProbe` over SSH), marked `TODO(S1)` in code;
+Armsmith never fabricates a hardware number.
+
+The drop-in CI twin runs the same gate on an Arm runner:
+
+```yaml
+# .github/workflows/perf-gate.yml
+jobs:
+  arm-perf-gate:
+    runs-on: ubuntu-24.04-arm  # free native-arm64 hosted runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: edycutjong/armsmith@v1  # composite action — see action.yml
+        with:
+          replay: fixtures/replays/scenario_ragserve
+```
+
+## 📊 Engineering Rigor
+
+| metric | value |
+|---|---|
+| Tests | **234** passing, ~93% line coverage |
+| CI jobs per push | 8 — incl. **5 native arm64** (4 test legs + 1 live bench) |
+| Rules | 13, each with a citation + positive/negative fixtures |
+| Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
+| ISA witness | `SDOT 0 → 1` in the hot symbol, from real disassembly |
+| Report integrity | ed25519 signature + sha256 content hash + full statistic recompute |
+| Security | CodeQL **0 alerts** · TruffleHog (full history) · Dependabot · pip-audit |
+
+### Measured on Real Arm Silicon
+
+Everything else here proves the loop is *honest*. This is where it stops being a replay.
 
 `armsmith bench-live` compiles [`bench/int8_dot.c`](bench/int8_dot.c) — an int8×int8→int32 dot
 product, the quantized-inference inner loop in miniature — **twice from one source**, differing only
@@ -158,21 +224,83 @@ armsmith verify report-live.json            # hash + ed25519 + schema + recomput
 CI runs exactly those two commands on every push and uploads the signed report as a build artifact,
 so the numbers above are re-derivable by anyone with the repo and an Arm runner — including you.
 
-## 📁 Repo Layout
+### The Trust Chain
 
+1. **Statistics engine** (`armsmith.benchstats`) — median-of-N, MAD noise bands
+   (`k·√(smad_a²+smad_b²)`, k=3), p50/p95 by documented linear interpolation, ABAB interleave
+   planning, and a hard *refuse-to-claim-inside-band* rule.
+2. **Reproduce gate** (`armsmith.gate`) — drop on hash mismatch, drop on any out-of-band
+   regression, drop when nothing clears the band. Reasons are machine-readable and shipped.
+3. **Tamper-evident reports** (`armsmith.report`) — raw samples embedded next to every claimed
+   statistic; canonical-JSON sha256 content addressing; ed25519 signature; `armsmith verify`
+   *recomputes every statistic and gate verdict from the embedded samples*. Editing a number
+   without re-running the math is detectable. Schema: [`schema/report.schema.json`](schema/report.schema.json).
+4. **ISA witness** (`armsmith.witness`) — counts SDOT/UDOT/SMMLA/USMMLA in disassembly
+   before/after: wall-clock can be argued with; emitted instructions cannot.
+5. **PR evidence** (`armsmith.evidence`, `armsmith.ghpr`) — the
+   `| metric | before | after | Δ | noise band | PMU Δ |` table, the drop log, and the judge-facing
+   `cosign verify-blob` command line. PR module is **dry-run only** here: it renders exactly what
+   would be posted and never touches the network.
+
+### Honesty Notes
+
+- Replay bundles are **synthetic shapes**, generated by `scripts/make_fixtures.py` and labeled in
+  every `manifest.json`; loaders refuse unlabeled measurement data, reports carry
+  `mode: "replay"` + `synthetic: true`, and every rendered artifact shows a replay banner.
+- `armsmith doctor` refuses to run without `--offline` + a recorded fixture: this development
+  machine is never fingerprinted as if it were a target.
+- The planner cannot claim results; only the gate can, and `armsmith verify` re-checks the gate.
+- **Live and replay never mix.** `bench-live` reports carry `mode: "live"` + `synthetic: false`;
+  every other report carries `mode: "replay"` + `synthetic: true`. `bench-live` raises rather than
+  run on a non-`aarch64` host, so there is no code path that yields an Arm number off Arm silicon —
+  and a unit test asserts exactly that.
+- `LiveProbe` **refuses** the `env` and `proc_maps` probes even though it could trivially serve
+  them: a report is a published artifact, and a CI environment block contains tokens. Every probe it
+  cannot answer honestly raises instead of guessing.
+- The live 7.4× is one microbenchmark on one runner, not a claim about your model. It is there to
+  prove the *gate* works on real silicon; the honest way to get your number is to run it on yours.
+- The `benchstats` module is shared with the Assayer project (declared in both repos).
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python **3.11** or **3.12**
+- No Arm hardware and no network beyond `pip` — the whole judge surface runs on an x86 laptop
+- *(optional)* an `aarch64` box + `gcc`/`objdump` if you want to take the live measurement yourself
+
+### Installation
+
+```bash
+git clone https://github.com/edycutjong/armsmith && cd armsmith
+python -m venv .venv && source .venv/bin/activate
+pip install -e '.[dev]'
 ```
-src/armsmith/          benchstats · probes · fingerprint · gguf · rules/ (packs + 13 detectors)
-                       gate · report · keys · evidence · witness · ghpr · planner/ · diagnose · cli
-                       livebench (the live Arm A/B: compile → witness → measure → gate)
-bench/int8_dot.c       the live workload — one source, compiled two ways (rule R2)
-schema/                report.schema.json (draft 2020-12, CI-validated)
-fixtures/              hosts/ · rules/rXX_{pos,neg}/ · replays/scenario_ragserve/ · witness/
-scripts/               make_fixtures.py (fixture provenance) · verify_offline.py
-tests/                 234 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
-docs/assets/           brand + hero assets (see ASSETS pipeline)
-docs/migration-templates/  13 x86→Arm migration cards (armsmith rules export)
-action.yml             composite GitHub Action — drop-in arm64 perf-regression gate
+
+### Judge Quickstart — Zero Hardware (~2 min)
+
+This is the primary "runnable by a judge" surface, because most judges have no Graviton box. All
+commands exit 0; the tamper step at the end goes red on purpose.
+
+```bash
+python -m pytest -q                                            # 234 passing, fully offline
+armsmith scan fixtures/replays/scenario_ragserve               # static R1/R4/R12 on a real dir, zero hardware
+armsmith diagnose --replay fixtures/replays/scenario_ragserve  # full reproduce gate (4 kept, 2 dropped)
+armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt  # ISA proof: 0→4 dotprod
+armsmith verify fixtures/replays/scenario_ragserve/report.json # -> VERIFY OK (recomputes every stat)
+armsmith ci --replay fixtures/replays/scenario_ragserve        # -> CI GATE PASSED (exit-code CI twin)
+python scripts/verify_offline.py                               # -> ALL CHECKS PASSED — honest & offline
 ```
+
+**The 20-second trust proof (whole pitch, zero hardware):** open
+`fixtures/replays/scenario_ragserve/report.json`, change one digit in any `samples` array, re-run
+`armsmith verify …/report.json` → red **`VERIFY FAILED`**. You never trust the printed number; the
+arithmetic is independently re-derivable and tamper-evident.
+
+Other surfaces: `armsmith rules list` · `armsmith rules explain R13` (fix + Arm Learning Path) ·
+`armsmith rules export --format md` (writes the 13 migration-template cards to `docs/migration-templates/`) ·
+`armsmith doctor --offline --replay fixtures/replays/scenario_ragserve` (host/ISA fingerprint) ·
+`armsmith pr fixtures/replays/scenario_ragserve/report.json` (renders the bot PR — dry-run).
 
 ## 🧪 Testing & CI
 
@@ -196,7 +324,7 @@ offline end-to-end loop and a JSON-Schema check on `schema/report.schema.json`. 
 is replay/fixture-based, the arm64 legs need zero Arm-specific setup and prove the package is
 arch-clean. A separate **`live-bench`** job then runs `armsmith bench-live --require-witness` on
 `ubuntu-24.04-arm`, verifies the signed report it produces, and uploads it as an artifact — that job
-is where the numbers in [Measured on Real Arm Silicon](#-measured-on-real-arm-silicon) come from.
+is where the numbers in [Measured on Real Arm Silicon](#measured-on-real-arm-silicon) come from.
 
 | layer | tool | status |
 |---|---|---|
@@ -216,55 +344,21 @@ Everything above is real today. The live Arm row is a genuine measurement taken 
 runner; the last row is the honestly-deferred remainder — no CI job claims a measurement it did not
 take.
 
-## ✅ Honesty Notes
+## 📁 Project Structure
 
-- Replay bundles are **synthetic shapes**, generated by `scripts/make_fixtures.py` and labeled in
-  every `manifest.json`; loaders refuse unlabeled measurement data, reports carry
-  `mode: "replay"` + `synthetic: true`, and every rendered artifact shows a replay banner.
-- `armsmith doctor` refuses to run without `--offline` + a recorded fixture: this development
-  machine is never fingerprinted as if it were a target.
-- The planner cannot claim results; only the gate can, and `armsmith verify` re-checks the gate.
-- **Live and replay never mix.** `bench-live` reports carry `mode: "live"` + `synthetic: false`;
-  every other report carries `mode: "replay"` + `synthetic: true`. `bench-live` raises rather than
-  run on a non-`aarch64` host, so there is no code path that yields an Arm number off Arm silicon —
-  and a unit test asserts exactly that.
-- `LiveProbe` **refuses** the `env` and `proc_maps` probes even though it could trivially serve
-  them: a report is a published artifact, and a CI environment block contains tokens. Every probe it
-  cannot answer honestly raises instead of guessing.
-- The live 7.4× is one microbenchmark on one runner, not a claim about your model. It is there to
-  prove the *gate* works on real silicon; the honest way to get your number is to run it on yours.
-- The `benchstats` module is shared with the Assayer project (declared in both repos).
-
-## 🏗️ Full Setup on Arm64 (Track 2 — Cloud AI)
-
-Armsmith is arch-clean Python; it installs and runs identically on `aarch64`. On a native Arm64 box
-(AWS Graviton `c7g`/`c8g`, Ampere, Axion, or a GitHub `ubuntu-24.04-arm` runner):
-
-```bash
-sudo apt-get update && sudo apt-get install -y python3-venv  # (perf, hyperfine, llama.cpp = live-mode, S1)
-git clone https://github.com/edycutjong/armsmith && cd armsmith
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e '.[dev]'
-python -m pytest -q. # 234 passing on aarch64
-armsmith doctor --offline --replay fixtures/replays/scenario_ragserve  # shows dotprod/i8mm/SVE routing
-armsmith diagnose --replay fixtures/replays/scenario_ragserve  # identical loop, native arm64
 ```
-
-The offline suite proves the package is arch-clean on real Arm silicon. **Live capture** — driving
-`perf`/`hyperfine`/`llama-bench` on the target and recording a real before/after — is the S1 path
-(`armsmith diagnose <repo> --target ssh://…`, `LiveProbe`), marked `TODO(S1)` in code; Armsmith
-never fabricates a hardware number. The drop-in CI twin runs the same gate on an Arm runner:
-
-```yaml
-# .github/workflows/perf-gate.yml
-jobs:
-  arm-perf-gate:
-    runs-on: ubuntu-24.04-arm  # free native-arm64 hosted runner
-    steps:
-      - uses: actions/checkout@v4
-      - uses: edycutjong/armsmith@v1  # composite action — see action.yml
-        with:
-          replay: fixtures/replays/scenario_ragserve
+src/armsmith/          benchstats · probes · fingerprint · gguf · rules/ (packs + 13 detectors)
+                       gate · report · keys · evidence · witness · ghpr · planner/ · diagnose · cli
+                       livebench (the live Arm A/B: compile → witness → measure → gate)
+bench/int8_dot.c       the live workload — one source, compiled two ways (rule R2)
+schema/                report.schema.json (draft 2020-12, CI-validated)
+fixtures/              hosts/ · rules/rXX_{pos,neg}/ · replays/scenario_ragserve/ · witness/
+scripts/               make_fixtures.py (fixture provenance) · verify_offline.py
+tests/                 234 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
+site/                  landing page + pitch deck (deployed straight from this repo)
+docs/assets/           brand + hero assets (see ASSETS pipeline)
+docs/migration-templates/  13 x86→Arm migration cards (armsmith rules export)
+action.yml             composite GitHub Action — drop-in arm64 perf-regression gate
 ```
 
 ## 🧩 Reuse & Extend
@@ -284,6 +378,34 @@ DX clause and the rubric's reusable-artifacts Impact:
 - **Drop-in Arm CI gate** — `uses: edycutjong/armsmith@v1` on `runs-on: ubuntu-24.04-arm` (see
   [`action.yml`](action.yml)); the Marketplace *listing* is publish-pending, never claimed as live.
 
+## 🗺️ Roadmap
+
+- [x] 13-rule pack with citations, fixtures, and deterministic fix generators
+- [x] Reproduce gate — noise bands, output-hash equality, machine-readable drop reasons
+- [x] Tamper-evident signed reports + `verify` statistic recompute
+- [x] ISA witness (SDOT/UDOT/SMMLA/USMMLA) driven against real binaries
+- [x] Native arm64 CI + **live measured A/B on Neoverse-N2**
+- [ ] `LiveProbe` over `ssh://` + `record_replays.sh` (live runs write replayable bundles)
+- [ ] Live instruments: `perf`/PMU, hyperfine, llama-bench, Arm Performix CLI ingestion
+- [ ] Claude planner tool-use loop (contract already pinned in `planner/interface.py`)
+- [ ] Real PR posting (`armsmith pr` is dry-run only today) + cosign keyless attestation in CI
+- [ ] Arm MCP Server handshake → `query_arm_mcp` container-validation cross-check
+
+## 📽️ Demo Materials
+
+- **Live site:** [armsmith.vercel.app](https://armsmith.vercel.app) — deployed straight from
+  [`site/`](site/) in this repo, so the page you see is the source you can read.
+- **Pitch deck:** [armsmith.vercel.app/deck.html](https://armsmith.vercel.app/deck.html)
+- **Signed live report:** downloadable from any CI run as the `armsmith-live-report-arm64` artifact.
+
 ## 📄 License
 
 MIT — see [LICENSE](LICENSE).
+
+## 🙏 Acknowledgments
+
+- **Arm Learning Paths** and upstream Arm/llama.cpp/ONNX Runtime documentation — every rule in the
+  pack cites a real source rather than folk wisdom.
+- **GitHub arm64 hosted runners**, which made a genuine Neoverse-N2 measurement possible with no
+  hardware to rent.
+- The `benchstats` module is shared with the Assayer project (declared in both repos).
