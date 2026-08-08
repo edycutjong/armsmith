@@ -14,8 +14,8 @@
 
   <br/>
 
-  [![Live Demo](https://img.shields.io/badge/🚀_Live-Demo-06b6d4?style=for-the-badge)](https://armsmith.vercel.app)
-  [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://armsmith.vercel.app/deck.html)
+  [![Live Demo](https://img.shields.io/badge/🚀_Live-Demo-06b6d4?style=for-the-badge)](https://armsmith.edycu.dev)
+  [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://armsmith.edycu.dev/deck.html)
   [![Built for Arm AI Optimization Challenge](https://img.shields.io/badge/Devpost-Arm_AI_Challenge-8b5cf6?style=for-the-badge)](https://arm-ai-optimization-challenge.devpost.com/)
 
   <br/>
@@ -393,9 +393,9 @@ DX clause and the rubric's reusable-artifacts Impact:
 
 ## 📽️ Demo Materials
 
-- **Live site:** [armsmith.vercel.app](https://armsmith.vercel.app) — deployed straight from
+- **Live site:** [armsmith.edycu.dev](https://armsmith.edycu.dev) — deployed straight from
   [`site/`](site/) in this repo, so the page you see is the source you can read.
-- **Pitch deck:** [armsmith.vercel.app/deck.html](https://armsmith.vercel.app/deck.html)
+- **Pitch deck:** [armsmith.edycu.dev/deck.html](https://armsmith.edycu.dev/deck.html)
 - **Signed live report:** downloadable from any CI run as the `armsmith-live-report-arm64` artifact.
 
 ## 📄 License

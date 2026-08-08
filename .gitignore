@@ -32,3 +32,8 @@ htmlcov/
 # Asset pipeline node deps (docs/assets/ keeps sources, not node_modules)
 docs/assets
 .vercel
+
+# Run output. `armsmith diagnose` writes report.json into the cwd; it is a generated
+# artifact (synthetic:true in replay mode) and must never be committed as if it were
+# a checked-in result. Signed CI reports are published as build artifacts instead.
+/report.json
