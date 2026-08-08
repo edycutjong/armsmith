@@ -109,7 +109,7 @@ jobs:
           if [ -f live-evidence.md ]; then cat live-evidence.md >> "$GITHUB_STEP_SUMMARY"; fi
       - name: Upload the signed live report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: armsmith-live-report-arm64
           path: |
