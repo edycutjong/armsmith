@@ -27,7 +27,12 @@ jobs:
       - name: TruffleHog verified-secret scan
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified
+          # Lob is excluded, and only Lob: its detector matches `test_` followed by
+          # 35 characters, which is the exact shape of a pytest function name
+          # (test_verify_accepts_matching_trusted_key). It flagged 10 of our test
+          # names and zero credentials. Armsmith calls no Lob API, so the detector
+          # can only ever produce noise here. Every other detector stays on.
+          extra_args: --only-verified --exclude-detectors=Lob
 
   test:
     strategy:
