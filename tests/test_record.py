@@ -336,3 +336,25 @@ def test_synthetic_fixture_is_still_labelled_synthetic(tmp_path):
     assert report["synthetic"] is True
     body = render_markdown(report)
     assert "SYNTHETIC DATA" in body
+
+
+def test_recording_into_a_directory_inside_the_repo_does_not_recurse(tmp_path, monkeypatch):
+    """The documented invocation is `armsmith record . --out ./armsmith-bundle`.
+
+    The bundle therefore lives inside the tree being copied, and copytree will
+    descend into the directory it is writing until the interpreter gives up.
+    This reproduced as a RecursionError on CI.
+    """
+    _no_numpy(monkeypatch)
+    _fake_live(monkeypatch, {})
+
+    repo = tmp_path / "proj"
+    (repo / "pkg").mkdir(parents=True)
+    (repo / "pkg" / "a.py").write_text("import numpy as np\nx = np.zeros(4)\n")
+
+    res = rec.record_bundle(repo, repo / "armsmith-bundle")     # inside the repo
+
+    assert res.repo_copied
+    assert (repo / "armsmith-bundle" / "repo" / "pkg" / "a.py").is_file()
+    # the bundle must not have copied itself
+    assert not list((repo / "armsmith-bundle" / "repo").rglob("armsmith-bundle"))

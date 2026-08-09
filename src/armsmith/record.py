@@ -235,13 +235,24 @@ def record_bundle(
         dest = out_dir / "repo"
         if dest.exists():
             shutil.rmtree(dest)
-        shutil.copytree(
-            repo,
-            dest,
-            ignore=shutil.ignore_patterns(
-                ".git", ".venv", "venv", "node_modules", "__pycache__", "*.pyc"
-            ),
-        )
+
+        # The bundle usually lives INSIDE the repo being recorded — the
+        # documented invocation is `armsmith record . --out ./armsmith-bundle`.
+        # Without excluding it, copytree descends into the directory it is
+        # writing and recurses until the interpreter gives up.
+        bundle_root = out_dir.resolve()
+        skip_names = {".git", ".venv", "venv", "node_modules", "__pycache__"}
+
+        def _ignore(directory: str, names: list[str]) -> set[str]:
+            ignored = {n for n in names if n in skip_names or n.endswith(".pyc")}
+            here = Path(directory).resolve()
+            for name in names:
+                candidate = here / name
+                if candidate == bundle_root or bundle_root in candidate.parents:
+                    ignored.add(name)
+            return ignored
+
+        shutil.copytree(repo, dest, ignore=_ignore)
         result.repo_copied = True
 
     # --- manifest -------------------------------------------------------------
