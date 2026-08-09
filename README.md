@@ -25,7 +25,7 @@
   [![CI](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/edycutjong/armsmith?sort=semver&logo=semanticrelease&logoColor=white&color=2EE6A6)](https://github.com/edycutjong/armsmith/releases)
   [![PyPI](https://img.shields.io/pypi/v/armsmith?logo=pypi&logoColor=white&color=3775A9)](https://pypi.org/project/armsmith/)
-  ![447 tests passing](https://img.shields.io/badge/tests-447%20passing-brightgreen)
+  ![449 tests passing](https://img.shields.io/badge/tests-449%20passing-brightgreen)
   ![coverage 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)
   ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat&logo=python&logoColor=white)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
@@ -84,7 +84,7 @@ run the replay bundle:
 ```bash
 git clone https://github.com/edycutjong/armsmith && cd armsmith
 python3 -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
-python -m pytest -q                                       # 447 passing, offline
+python -m pytest -q                                       # 449 passing, offline
 armsmith diagnose --replay fixtures/replays/scenario_ragserve   # 4 kept · 2 dropped
 ```
 
@@ -127,7 +127,7 @@ trust the number that was printed at you.
 
 ### What is measured, and what is replayed
 
-**Status: hardware-free core + one live Arm leg.** `447` pytest tests, all green, at **100% line
+**Status: hardware-free core + one live Arm leg.** `449` pytest tests, all green, at **100% line
 coverage**. The rule pack, the planner and the diagnose loop run against **replay bundles**, and a
 bundle is one of two things, always labeled:
 
@@ -246,7 +246,7 @@ disagreement makes the rule refuse to diagnose.
 | Report schema | `jsonschema` (draft 2020-12) | public contract, CI-validated — build your own viewer against it |
 | Live Arm bench | GCC + binutils `objdump` on aarch64 | compile A/B from one source, then count SDOT in the disassembly |
 | CI | GitHub Actions — `ubuntu-24.04-arm` · `ubuntu-22.04-arm` · `ubuntu-latest` × Py 3.11/3.12 | native arm64 legs, free, no hardware to rent |
-| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 447 tests, 100% line coverage |
+| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 449 tests, 100% line coverage |
 
 ## 🏆 Arm Integration (Cloud AI Track)
 
@@ -273,7 +273,7 @@ sudo apt-get update && sudo apt-get install -y python3-venv  # (perf, hyperfine,
 git clone https://github.com/edycutjong/armsmith && cd armsmith
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
-python -m pytest -q                                                    # 447 passing on aarch64
+python -m pytest -q                                                    # 449 passing on aarch64
 armsmith doctor --offline --replay fixtures/replays/scenario_ragserve  # shows dotprod/i8mm/SVE routing
 armsmith diagnose --replay fixtures/replays/scenario_ragserve          # identical loop, native arm64
 armsmith bench-live --require-witness                                  # the real measurement, on your silicon
@@ -317,7 +317,7 @@ armsmith record . --out ./armsmith-bundle
 [![Vercel](https://img.shields.io/badge/Vercel-site-000000?logo=vercel&logoColor=white)](https://vercel.com/)
 
 <sub><b>Quality gates</b></sub><br/>
-[![pytest](https://img.shields.io/badge/pytest-447%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![pytest](https://img.shields.io/badge/pytest-1%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
 [![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![mypy](https://img.shields.io/badge/mypy-typed-1F5082)](https://mypy-lang.org/)
 [![CodeQL](https://img.shields.io/badge/CodeQL-0%20alerts-2088FF?logo=github&logoColor=white)](https://github.com/edycutjong/armsmith/security/code-scanning)
@@ -326,7 +326,7 @@ armsmith record . --out ./armsmith-bundle
 
 | metric | value |
 |---|---|
-| Tests | **447** passing, **100%** line coverage |
+| Tests | **1** passing, **100%** line coverage |
 | CI jobs per push | 8 — incl. **5 native arm64** (4 test legs + 1 live bench) |
 | Rules | 13, each with a citation + positive/negative fixtures |
 | Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
@@ -338,10 +338,21 @@ armsmith record . --out ./armsmith-bundle
 
 Everything else here proves the loop is *honest*. This is where it stops being a replay.
 
-`armsmith bench-live` compiles [`bench/int8_dot.c`](bench/int8_dot.c) — an int8×int8→int32 dot
-product, the quantized-inference inner loop in miniature — **twice from one source**, differing only
-in the `-march` flag that rule **R2** exists to flag. It then measures both builds on the machine it
-is running on. It refuses to run on anything that is not `aarch64`.
+`armsmith bench-live` compiles a kernel **twice from one source**, differing only in the `-march`
+flag that rule **R2** exists to flag, then measures both builds on the machine it is running on. It
+refuses to run on anything that is not `aarch64`. There are two cases, on purpose — one measured
+kernel is a data point, two on different ISA extensions is a harness:
+
+| `--case` | source | flag under test | instruction | how the fast path is reached |
+|---|---|---|---|---|
+| `dot` (default) | [`bench/int8_dot.c`](bench/int8_dot.c) | `+dotprod` | **SDOT** | GCC's vectorizer finds it in plain C |
+| `mmla` | [`bench/int8_mmla.c`](bench/int8_mmla.c) | `+i8mm` | **SMMLA** | ACLE intrinsic behind the feature macro |
+
+The second case is honest about the difference: GCC does *not* reliably auto-vectorize a 2×8·8×2
+int8 matmul into `SMMLA`, so that path uses `vmmlaq_s32` guarded by `__ARM_FEATURE_MATMUL_INT8`,
+with a scalar fallback computing identical arithmetic. That is also how real libraries ship —
+KleidiAI selects its micro-kernel per detected CPU capability — so the flag genuinely gates the code
+path, and both builds must still produce the same checksum or the gate drops the fix.
 
 Latest run, on a **GitHub-hosted `ubuntu-24.04-arm` runner** ([`ci.yml`](.github/workflows/ci.yml) →
 job *Live Arm reproduce gate*), host **Neoverse-N2**, `gcc 13.3.0`:
@@ -457,7 +468,7 @@ This is the primary "runnable by a judge" surface, because most judges have no G
 commands exit 0; the tamper step at the end goes red on purpose.
 
 ```bash
-python -m pytest -q                                            # 447 passing, fully offline
+python -m pytest -q                                            # 449 passing, fully offline
 armsmith scan fixtures/replays/scenario_ragserve               # static R1/R4/R12 on a real dir, zero hardware
 armsmith diagnose --replay fixtures/replays/scenario_ragserve  # full reproduce gate (4 kept, 2 dropped)
 armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt  # ISA proof: 0→4 dotprod
@@ -484,7 +495,7 @@ The replay harness is hardware-free and runs in under a second locally; the live
 ```bash
 .venv/bin/pip install -e '.[dev]'
 
-.venv/bin/python -m pytest -q               # 447 tests, 100% line coverage
+.venv/bin/python -m pytest -q               # 449 tests, 100% line coverage
 .venv/bin/ruff check .                      # lint gate (clean)
 .venv/bin/mypy src                          # types — advisory, not a gate
 .venv/bin/python scripts/verify_offline.py  # scan → gate → sign → verify, end-to-end
@@ -502,7 +513,7 @@ is where the numbers in [Measured on Real Arm Silicon](#measured-on-real-arm-sil
 
 | layer | tool | status |
 |---|---|---|
-| unit + replay suite | pytest (447 tests, 100% cov) | ✅ green, offline |
+| unit + replay suite | pytest (449 tests, 100% cov) | ✅ green, offline |
 | lint | ruff | ✅ gate |
 | types | mypy | ✅ advisory (`continue-on-error`) |
 | end-to-end loop | `verify_offline.py` | ✅ scan → gate → sign → verify |
@@ -528,7 +539,7 @@ bench/int8_dot.c       the live workload — one source, compiled two ways (rule
 schema/                report.schema.json (draft 2020-12, CI-validated)
 fixtures/              hosts/ · rules/rXX_{pos,neg}/ · replays/scenario_ragserve/ · witness/
 scripts/               make_fixtures.py (fixture provenance) · verify_offline.py
-tests/                 447 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
+tests/                 449 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
 site/                  landing page + pitch deck (deployed straight from this repo)
 docs/assets/           brand + hero assets (see ASSETS pipeline)
 docs/migration-templates/  13 x86→Arm migration cards (armsmith rules export)

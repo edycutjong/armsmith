@@ -49,6 +49,9 @@ from .witness import WitnessCount, count_witness
 
 __all__ = [
     "KERNEL_SYMBOL",
+    "BenchCase",
+    "CASES",
+    "DEFAULT_CASE",
     "BASELINE",
     "CANDIDATE",
     "VariantSpec",
@@ -98,6 +101,67 @@ CANDIDATE = VariantSpec(
     rule_id="R2",
     summary="ARMv8.2 + dotprod — lets the vectorizer emit SDOT",
 )
+
+
+@dataclass(frozen=True)
+class BenchCase:
+    """One live A/B: a source, the symbol to disassemble, and the two builds.
+
+    Two cases exist so the live leg is a harness rather than one lucky
+    microbenchmark — a different ISA extension, a different instruction, the
+    same gate.
+    """
+
+    key: str
+    source: str
+    symbol: str
+    baseline: VariantSpec
+    candidate: VariantSpec
+    rule_id: str
+    scenario: str
+    headline: str
+
+
+#: SDOT via the compiler's own vectorizer — plain C, no intrinsics.
+CASE_DOT = BenchCase(
+    key="dot",
+    source="int8_dot.c",
+    symbol="dot_i8",
+    baseline=BASELINE,
+    candidate=CANDIDATE,
+    rule_id="R2",
+    scenario="live-int8-dot-r2",
+    headline="int8 dot product — +dotprod lets GCC emit SDOT",
+)
+
+#: SMMLA via ACLE intrinsics behind the feature macro the flag defines. GCC does
+#: not reliably auto-vectorize this shape, and the source says so: the flag
+#: gates the code path, which is how KleidiAI and llama.cpp actually ship
+#: per-capability kernels. Both paths compute identical arithmetic, so a
+#: checksum difference would (correctly) drop the fix on output inequality.
+CASE_MMLA = BenchCase(
+    key="mmla",
+    source="int8_mmla.c",
+    symbol="mmla_i8",
+    baseline=VariantSpec(
+        name="baseline",
+        cflags=("-O3", "-march=armv8.2-a"),
+        rule_id=None,
+        summary="ARMv8.2 without i8mm — the int8 matmul unit is off the table",
+    ),
+    candidate=VariantSpec(
+        name="fix_i8mm",
+        cflags=("-O3", "-march=armv8.2-a+i8mm"),
+        rule_id="R2",
+        summary="ARMv8.2 + i8mm — enables the SMMLA matmul path",
+    ),
+    rule_id="R2",
+    scenario="live-int8-mmla-i8mm",
+    headline="int8 2x8*8x2 matmul — +i8mm enables SMMLA",
+)
+
+CASES = {c.key: c for c in (CASE_DOT, CASE_MMLA)}
+DEFAULT_CASE = CASE_DOT
 
 
 class ToolchainError(RuntimeError):
@@ -183,18 +247,18 @@ def detect_toolchain(require_arm: bool = True) -> Toolchain:
     )
 
 
-def kernel_source() -> Path:
-    """Absolute path to bench/int8_dot.c, wherever the package is installed."""
+def kernel_source(filename: str = "int8_dot.c") -> Path:
+    """Absolute path to a bench/ kernel source, wherever the package lives."""
     # src/armsmith/livebench.py -> src/armsmith -> src -> repo root
     candidates = [
-        Path(__file__).resolve().parents[2] / "bench" / "int8_dot.c",
-        Path.cwd() / "bench" / "int8_dot.c",
+        Path(__file__).resolve().parents[2] / "bench" / filename,
+        Path.cwd() / "bench" / filename,
     ]
     for path in candidates:
         if path.is_file():
             return path
     raise ToolchainError(
-        "bench/int8_dot.c not found — the live bench needs its kernel source "
+        f"bench/{filename} not found — the live bench needs its kernel source "
         f"(looked in {[str(c) for c in candidates]})"
     )
 
@@ -292,6 +356,7 @@ def _run_once(binary: Path, n: int, reps: int) -> tuple[str, float]:
 @dataclass
 class LiveBenchResult:
     toolchain: Toolchain
+    case: BenchCase
     lscpu: str
     baseline: BuildArtifact
     candidate: BuildArtifact
@@ -319,8 +384,9 @@ class LiveBenchResult:
             "performix_ref": None,
             "toolchain": self.toolchain.to_dict(),
             "workload": {
-                "source": "bench/int8_dot.c",
-                "symbol": KERNEL_SYMBOL,
+                "source": f"bench/{self.case.source}",
+                "symbol": self.case.symbol,
+                "case": self.case.key,
                 "n": self.n,
                 "reps": self.reps,
                 "warmup_rounds": self.warmup,
@@ -336,7 +402,7 @@ class LiveBenchResult:
                 "delta_total": self.witness_gain,
                 "note": (
                     "SDOT/UDOT/SMMLA/USMMLA counted in the disassembly of "
-                    f"{KERNEL_SYMBOL} in each binary"
+                    f"{self.case.symbol} in each binary"
                 ),
             },
         }
@@ -349,10 +415,12 @@ def run_live_bench(
     warmup: int = 2,
     require_arm: bool = True,
     src: Path | None = None,
+    case: BenchCase | None = None,
 ) -> LiveBenchResult:
     """Compile, witness, and ABAB-measure both builds on this machine."""
+    case = case or DEFAULT_CASE
     tc = detect_toolchain(require_arm=require_arm)
-    source = Path(src) if src else kernel_source()
+    source = Path(src) if src else kernel_source(case.source)
 
     try:
         lscpu = subprocess.run(
@@ -364,9 +432,9 @@ def run_live_bench(
     with tempfile.TemporaryDirectory(prefix="armsmith-livebench-") as tmp:
         out_dir = Path(tmp)
         artifacts: dict[str, BuildArtifact] = {}
-        for spec in (BASELINE, CANDIDATE):
+        for spec in (case.baseline, case.candidate):
             binary, cmd = _compile(tc, spec, source, out_dir)
-            disasm = _disassemble(tc, binary, KERNEL_SYMBOL)
+            disasm = _disassemble(tc, binary, case.symbol)
             artifacts[spec.name] = BuildArtifact(
                 spec=spec,
                 binary=binary,
@@ -378,7 +446,7 @@ def run_live_bench(
         # ABAB interleave: the same planner the replay path documents, so slow
         # drift lands on both variants instead of on whichever ran second.
         slots = plan_interleaved(
-            [BASELINE.name, CANDIDATE.name], reps=measured_rounds, warmup=warmup
+            [case.baseline.name, case.candidate.name], reps=measured_rounds, warmup=warmup
         )
         schedule = [f"{'w' if s.warmup else 'm'}:{s.variant}" for s in slots]
         for slot in slots:
@@ -398,9 +466,10 @@ def run_live_bench(
 
         return LiveBenchResult(
             toolchain=tc,
+            case=case,
             lscpu=lscpu,
-            baseline=artifacts[BASELINE.name],
-            candidate=artifacts[CANDIDATE.name],
+            baseline=artifacts[case.baseline.name],
+            candidate=artifacts[case.candidate.name],
             n=n,
             reps=reps,
             warmup=warmup,

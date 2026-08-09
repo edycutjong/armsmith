@@ -27,7 +27,7 @@
     replace the single <path> inside #qr-svg.
 
   HONESTY CONTRACT (do not edit numbers casually)
-    Every number in this deck traces to the repo: 447 offline tests, 100%
+    Every number in this deck traces to the repo: 449 offline tests, 100%
     coverage, 13 rules, 10 Arm Learning Path citations, 6→4 kept/2 dropped
     on the ragserve replay seed, witness 0→4 dotprod (replay fixture).
     ONE hardware measurement is claimed, and only one: the int8 microkernel
@@ -818,7 +818,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
       <span class="callout" aria-hidden="true">1</span>
       <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="term-title">the harness — offline</span></div>
       <div class="term-body"><span class="p">$</span> python -m pytest -q
-<span class="ok">447 passed</span> <span class="d">— fully offline · 100% line coverage</span>
+<span class="ok">449 passed</span> <span class="d">— fully offline · 100% line coverage</span>
 
 <span class="p">$</span> armsmith scan fixtures/replays/scenario_ragserve
 <span class="d">static rules on a real directory — zero hardware:</span>
@@ -927,7 +927,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
       <h3><b>■</b> real today — verifiable by a judge</h3>
       <div class="numgrid">
         <div><div class="n">&minus;86.5<i>%</i></div><p>measured on a Neoverse&#8209;N2 runner · <b>SDOT 0→1</b> · gate <b>keep</b> · signed report</p></div>
-        <div><div class="n">447<i>✓</i></div><p>pytest tests passing · 100% line coverage · zero network</p></div>
+        <div><div class="n">449<i>✓</i></div><p>pytest tests passing · 100% line coverage · zero network</p></div>
         <div><div class="n">13<i>+13</i></div><p>aarch64 rules → 13 exported x86→Arm migration cards, 12 with a paste-able before→after diff</p></div>
         <div><div class="n">uvx<i>↴</i></div><p><code class="mono">uvx armsmith scan .</code> — on <b>PyPI</b>, published from CI by Trusted Publishing; nothing to clone</p></div>
         <div><div class="n">10<i>/13</i></div><p>rules citing an Arm Learning Path — the judges' own curriculum</p></div>
@@ -949,7 +949,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
     </div>
   </div>
   <div class="ghost" aria-hidden="true">09</div>
-  <aside class="speaker-notes">The core is hardware-free and says so in every artifact — 447 tests,
+  <aside class="speaker-notes">The core is hardware-free and says so in every artifact — 449 tests,
   all offline — and exactly one leg is real silicon: the int8 A/B on a Neoverse-N2 runner, which is
   where the &minus;86.5% comes from. The left column is verifiable today; the right column is marked
   TODO in the code — the loaders literally refuse measurement data that isn't labeled synthetic.</aside>
@@ -967,7 +967,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
       <div class="term-body"><span class="p">$</span> git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith
 <span class="p">$</span> python -m venv .venv &amp;&amp; source .venv/bin/activate
 <span class="p">$</span> pip install -e '.[dev]'
-<span class="p">$</span> python -m pytest -q                              <span class="d"># </span><span class="ok">447 passed</span><span class="d"> · offline</span>
+<span class="p">$</span> python -m pytest -q                              <span class="d"># </span><span class="ok">449 passed</span><span class="d"> · offline</span>
 <span class="p">$</span> armsmith scan fixtures/replays/scenario_ragserve <span class="d"># static rules, zero hw</span>
 <span class="p">$</span> armsmith diagnose --replay fixtures/replays/scenario_ragserve
                                                     <span class="d"># </span><span class="ok">4 kept</span><span class="d"> · </span><span class="no">2 dropped</span>

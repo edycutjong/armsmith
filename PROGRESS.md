@@ -2,7 +2,7 @@
 
 Session: 2026-07-04, extended 2026-08-08 · build target `build/` · specs FROZEN
 (deviations → DEVIATIONS.md).
-Suite: **447 pytest tests, 447 passing, 0 failing, 100% line coverage**
+Suite: **449 pytest tests, 449 passing, 0 failing, 100% line coverage**
 (`.venv/bin/python -m pytest`) plus
 `scripts/verify_offline.py` end-to-end green. Every measurement-shaped value is either a labeled
 synthetic replay fixture (`synthetic: true`) or a real live measurement (`mode: "live"`,
@@ -87,7 +87,7 @@ targets and the remaining instruments stay TODO(S1).
 
 ## Test count vs COMPLEXITY target
 
-**447 green now** vs blueprint target **150** (which included hardware-phase tests), at 100% line
+**449 green now** vs blueprint target **150** (which included hardware-phase tests), at 100% line
 coverage. The 2026-08-09 additions cover `armsmith record` (the honesty contract: manifest declares
 `synthetic: false`, refused probes are never written, unobservable probes are omitted rather than
 guessed) and R4's dtype-inference guard. Of the earlier 234, 208 are

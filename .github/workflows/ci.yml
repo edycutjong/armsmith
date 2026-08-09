@@ -57,7 +57,7 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (447 tests, 100% line coverage) with coverage
+      - name: Unit + replay suite (449 tests, 100% line coverage) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
@@ -151,6 +151,33 @@ jobs:
             --require-witness
       - name: Verify the live report (hash + ed25519 + schema + recompute)
         run: .venv/bin/armsmith verify report-live.json
+      # Second live A/B, different ISA extension and different instruction, so
+      # the live leg reads as a harness rather than one lucky microbenchmark.
+      # SMMLA comes from an ACLE intrinsic behind the feature macro (GCC does
+      # not reliably auto-vectorize this shape) — the source says so, and both
+      # paths compute identical arithmetic so the gate would drop any divergence
+      # on output-hash inequality.
+      #
+      # --require-witness is deliberately absent on this first landing: it is
+      # asserted below by reading the report, so an unexpected toolchain result
+      # is REPORTED rather than turning the whole build red.
+      - name: Live A/B #2 — SMMLA under +i8mm (native arm64)
+        run: |
+          .venv/bin/armsmith bench-live \
+            --case mmla \
+            --instance "github-hosted:ubuntu-24.04-arm" \
+            --out report-live-mmla.json \
+            --markdown live-evidence-mmla.md
+          .venv/bin/armsmith verify report-live-mmla.json
+          .venv/bin/python - <<'PY'
+          import json
+          r = json.load(open("report-live-mmla.json"))
+          w = r["artifacts"]["isa_witness"]
+          base = w["baseline"]["counts"].get("smmla", 0)
+          cand = w["fix_i8mm"]["counts"].get("smmla", 0)
+          print(f"SMMLA baseline={base} candidate={cand} delta={w['delta_total']}")
+          print("verdict:", r["fixes"][0]["verdict"])
+          PY
       # The record -> diagnose path on REAL hardware. Everywhere else in CI the
       # probe rules read fixtures we wrote; here `lscpu` and the THP sysfs node
       # genuinely exist, so this is the only job that can produce a bundle whose
@@ -195,6 +222,8 @@ jobs:
             report-live.json
             live-evidence.md
             report-recorded.json
+            report-live-mmla.json
+            live-evidence-mmla.md
 
   # ── STAGE 6: Deploy gate ──────────────────────────────────────────────
   # One required check that means "everything passed", so branch protection
@@ -213,7 +242,7 @@ jobs:
             echo ""
             echo "| stage | what it proved |"
             echo "|---|---|"
-            echo "| 1 · Quality | ruff + mypy + 447 tests at 100% line coverage, on 6 legs (4 native arm64) |"
+            echo "| 1 · Quality | ruff + mypy + 449 tests at 100% line coverage, on 6 legs (4 native arm64) |"
             echo "| 2 · Security | TruffleHog verified-secret scan over full git history · pip-audit |"
             echo "| 3 · Build | wheel installs clean and still finds its rule packs + schema |"
             echo "| 4 · E2E | offline scan → gate → sign → verify, plus the \`armsmith ci\` twin |"

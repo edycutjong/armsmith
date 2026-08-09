@@ -724,6 +724,11 @@ def bench_live(
         False, "--require-witness",
         help="Exit non-zero if the candidate build emits no SDOT/UDOT/SMMLA/USMMLA.",
     ),
+    case: str = typer.Option(
+        "dot", "--case",
+        help="Which live A/B to run: 'dot' (+dotprod -> SDOT, compiler-vectorised) "
+             "or 'mmla' (+i8mm -> SMMLA, intrinsic behind the feature macro).",
+    ),
 ) -> None:
     """LIVE reproduce gate on real Arm silicon — no replay, no fixtures.
 
@@ -737,12 +742,17 @@ def bench_live(
     from .fingerprint import capture_fingerprint
     from .gate import GateConfig, run_gate
     from .keys import KeyError_
-    from .livebench import METRIC, ToolchainError, run_live_bench
+    from .livebench import CASES, METRIC, ToolchainError, run_live_bench
     from .probes import LiveProbe
     from .witness import witness_delta
 
+    if case not in CASES:
+        err_console.print(f"unknown --case {case!r} — choose one of: {', '.join(CASES)}")
+        raise typer.Exit(code=2)
     try:
-        res = run_live_bench(n=n, reps=reps, measured_rounds=rounds, warmup=warmup)
+        res = run_live_bench(
+            n=n, reps=reps, measured_rounds=rounds, warmup=warmup, case=CASES[case]
+        )
     except (ToolchainError, ValueError) as exc:
         err_console.print(f"live bench failed: {exc}")
         raise typer.Exit(code=2)
@@ -819,26 +829,26 @@ def bench_live(
     evidence = [
         f"baseline built with: {' '.join(res.baseline.compile_command)}",
         f"candidate built with: {' '.join(res.candidate.compile_command)}",
-        f"dotprod instructions in {res.baseline.spec.name}: {res.baseline.witness.dotprod}"
-        f" → {res.candidate.spec.name}: {res.candidate.witness.dotprod}",
+        f"witness instructions in {res.baseline.spec.name}: {res.baseline.witness.total}"
+        f" → {res.candidate.spec.name}: {res.candidate.witness.total} ({res.case.headline})",
     ]
     finding = {
-        "rule_id": "R2",
+        "rule_id": res.case.rule_id,
         "status": "matched",
         "evidence": evidence,
-        "locations": ["bench/int8_dot.c"],
+        "locations": [f"bench/{res.case.source}"],
         "fix": None,
         "skipped_reason": None,
     }
     rpt = report_mod.build_report(
         mode="live",
-        scenario="live-int8-dot-r2",
-        repo={"url": "https://github.com/edycutjong/armsmith", "sha": "bench/int8_dot.c"},
+        scenario=res.case.scenario,
+        repo={"url": "https://github.com/edycutjong/armsmith", "sha": f"bench/{res.case.source}"},
         host=host,
         findings=[finding],
         outcome=outcome,
         gate_config=cfg,
-        plan=[{"rule_id": "R2", "reason": "live A/B of the -march flag R2 flags"}],
+        plan=[{"rule_id": res.case.rule_id, "reason": f"live A/B — {res.case.headline}"}],
         artifacts=res.artifacts_dict(),
         cost={"cost_usd": 0.0, "note": "measured on a GitHub-hosted arm64 runner — no direct spend"},
     )

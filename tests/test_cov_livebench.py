@@ -397,6 +397,7 @@ def _result(base_sha="sha-a", cand_sha="sha-a") -> livebench.LiveBenchResult:
             system="Linux",
             kernel="6.5.0-fake",
         ),
+        case=livebench.DEFAULT_CASE,
         lscpu=LSCPU_TEXT,
         baseline=_artifact(livebench.BASELINE, BASELINE_DISASM, [1.00, 1.01, 0.99], base_sha),
         candidate=_artifact(livebench.CANDIDATE, CANDIDATE_DISASM, [0.30, 0.31, 0.29], cand_sha),
@@ -435,6 +436,7 @@ def test_artifacts_dict_embeds_the_full_reproduce_block():
     assert d["workload"] == {
         "source": "bench/int8_dot.c",
         "symbol": "dot_i8",
+        "case": "dot",
         "n": 2048,
         "reps": 1000,
         "warmup_rounds": 1,

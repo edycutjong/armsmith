@@ -411,11 +411,16 @@ def test_bench_cmd_refuses_off_arm_with_exit_2(monkeypatch, tmp_path):
 
 
 def test_bench_cmd_strict_exits_nonzero_when_the_gate_drops(tmp_path, _arm):
-    """Two identical commands cannot beat the noise band, so the gate drops."""
+    """A candidate that is clearly SLOWER must not pass --strict.
+
+    Deliberately a regression rather than two identical commands: identical
+    commands land inside the noise band only *usually*, and a test that depends
+    on scheduler luck is a test that fails in CI for no reason.
+    """
     res = runner.invoke(app, [
         "bench-cmd",
         "--baseline-cmd", _pycmd("print(1)"),
-        "--candidate-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("import time; time.sleep(0.25); print(1)"),
         "--rounds", "3", "--warmup", "0", "--no-sign", "--strict",
         "--out", str(tmp_path / "r.json"),
     ])
@@ -524,3 +529,29 @@ def test_bench_cmd_with_a_rule_id_records_a_finding_and_still_verifies(tmp_path,
     assert rpt["findings"][0]["rule_id"] == "R3"
     assert rpt["plan"][0]["rule_id"] == "R3"
     assert runner.invoke(app, ["verify", str(out)]).exit_code == 0
+
+
+def test_bench_live_rejects_an_unknown_case():
+    res = runner.invoke(app, ["bench-live", "--case", "bogus"])
+    assert res.exit_code == 2
+    assert "unknown --case" in res.output
+    assert "dot, mmla" in res.output          # tells you the valid ones
+
+
+def test_both_live_cases_are_declared_coherently():
+    """Two cases exist so the live leg is a harness, not one microbenchmark.
+
+    Each must name a distinct source, symbol and ISA flag, or the second one
+    proves nothing the first didn't.
+    """
+    from armsmith.livebench import CASES
+
+    assert set(CASES) == {"dot", "mmla"}
+    dot, mmla = CASES["dot"], CASES["mmla"]
+    assert dot.symbol != mmla.symbol
+    assert dot.source != mmla.source
+    assert "dotprod" in " ".join(dot.candidate.cflags)
+    assert "i8mm" in " ".join(mmla.candidate.cflags)
+    # the baseline must NOT carry the extension it is meant to lack
+    assert "dotprod" not in " ".join(dot.baseline.cflags)
+    assert "i8mm" not in " ".join(mmla.baseline.cflags)
