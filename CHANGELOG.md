@@ -1,6 +1,102 @@
 # CHANGELOG
 
 
+## v1.3.0 (2026-08-09)
+
+### Continuous Integration
+
+- Require the SMMLA witness now that the runner has proven it
+  ([`216fecb`](https://github.com/edycutjong/armsmith/commit/216fecb8222278eb70f5977192faabe32721e4a3))
+
+The mmla case landed without --require-witness so an unexpected toolchain result would report rather
+  than redden the build. The runner has now measured SMMLA 0 -> 1 with verdict keep, so the
+  instruction demonstrably emits there.
+
+Turning the assertion on: if a future GCC or runner image stops emitting SMMLA, the premise of this
+  case is gone and CI should fail loudly rather than keep timing two builds that are secretly
+  identical.
+
+### Features
+
+- **bench-cmd**: Point the reproduce gate at the operator's own workload
+  ([`92b6edd`](https://github.com/edycutjong/armsmith/commit/92b6eddd0798c283b5ff19bed0bc5dcecda54710))
+
+The gate is the whole product, and it could only ever be aimed at this project's own
+  bench/int8_dot.c. So the one thing the tool is FOR - deciding whether a proposed fix is real -
+  could not be applied to a fix you actually made. An independent review put it plainly: the value
+  proposition in the tagline was not deliverable by a stranger.
+
+armsmith bench-cmd --rule R3 \ --baseline-cmd "python serve_bench.py --config before.yaml" \
+  --candidate-cmd "python serve_bench.py --config after.yaml"
+
+Identical statistics to everything else here: ABAB interleaving so drift lands on both sides,
+  median-of-N, scaled-MAD noise band, output-hash equality, and an ed25519-signed report that
+  `armsmith verify` re-derives from the embedded raw samples. A delta inside the band is reported as
+  no change, never as a win.
+
+What it deliberately does NOT do:
+
+- No ISA witness. There is no binary to disassemble, so artifacts record isa_witness.available =
+  false with a pointer to bench-live, rather than zero counters a reader could mistake for a
+  measurement. A test asserts no numeric counter ever appears there. - No running off aarch64. A
+  wall-clock number from an x86 box is not an Arm result; require_arm=False exists for a deliberate
+  non-Arm comparison and the host arch is recorded either way. - No non-deterministic workloads. If
+  stdout changes between runs the gate cannot tell an improvement from a different computation, so
+  it refuses to measure rather than compare two different things.
+
+Fixes a bug found by testing verify on its own output: a run without --rule stamped rule_id "-" into
+  the finding, which fails the report schema's ^R\d+$ and made a signed report unverifiable. An
+  operator-driven A/B now emits no finding at all rather than inventing a rule id - a fake id in a
+  signed report is exactly what this tool exists not to do. The commands are recorded in
+  artifacts.workload regardless.
+
+Also adds the R9 before/after snippet, so 12 of 13 migration cards now carry a paste-able diff; only
+  R13 stays diagnostic.
+
+Verified end to end on a real numpy float64-vs-float32 workload: +4.42% inside a +/-0.164 s band ->
+  no_change -> gate drop. It refused to claim a win from noise on a workload it had never seen. 447
+  tests, 100% coverage.
+
+- **bench-live**: Second live case — SMMLA under +i8mm
+  ([`47a953e`](https://github.com/edycutjong/armsmith/commit/47a953ebaf58c9a1862f2e3e59945f3ae5868b93))
+
+One measured kernel is a data point. The live leg now runs two, on different ISA extensions and
+  different instructions, so it reads as a harness rather than one lucky microbenchmark:
+
+--case dot (default) int8_dot.c +dotprod -> SDOT --case mmla int8_mmla.c +i8mm -> SMMLA
+
+bench/int8_mmla.c is a 2x8 * 8x2 -> 2x2 int8 matmul, the exact shape SMMLA implements and the shape
+  KleidiAI and llama.cpp's int8 GEMM kernels are built around. Compiled twice from one source,
+  differing only in the -march flag.
+
+HONEST about how the speedup happens, because it differs from the dot case. There, GCC's vectorizer
+  discovers SDOT from plain C. Here the fast path is the ACLE intrinsic vmmlaq_s32 behind
+  __ARM_FEATURE_MATMUL_INT8, because GCC does not reliably auto-vectorize this shape and pretending
+  otherwise would be the kind of claim this tool exists to refuse. The source says so in its header.
+  Feature-gated kernels are also what real libraries ship - KleidiAI selects its micro-kernel per
+  detected CPU capability exactly this way - so the flag genuinely gates the code path, and that
+  gate is what is measured. Both paths compute identical arithmetic, so any divergence is dropped by
+  the gate on output-hash inequality.
+
+Verified locally before landing: the +i8mm build contains 1 SMMLA in mmla_i8 and the baseline
+  contains 0 - the same 0->1 witness shape as SDOT. (The intrinsic build SIGILLs on this M1 Max,
+  which has no i8mm; that is the instruction being real, not a defect.)
+
+livebench is now parameterised by a BenchCase - source, symbol, both variant specs, rule id,
+  scenario - instead of hardcoding int8_dot.c and dot_i8, and the report's workload block records
+  which case ran.
+
+CI runs the new case on the arm64 runner and prints the SMMLA counts. It deliberately does NOT pass
+  --require-witness on this first landing: the counts are asserted by reading the signed report, so
+  an unexpected toolchain result is reported rather than turning the build red.
+
+Also de-flakes the bench-cmd --strict test, which depended on two identical commands landing inside
+  the noise band - true only usually, and a test that turns on scheduler luck fails in CI for no
+  reason. It now uses a candidate that is deliberately slower.
+
+449 tests, 100% coverage.
+
+
 ## v1.2.2 (2026-08-09)
 
 ### Bug Fixes
