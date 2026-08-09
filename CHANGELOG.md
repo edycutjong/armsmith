@@ -1,6 +1,22 @@
 # CHANGELOG
 
 
+## v1.0.4 (2026-08-09)
+
+### Bug Fixes
+
+- **release**: Attach the built sdist+wheel to the GitHub Release
+  ([`99c77d1`](https://github.com/edycutjong/armsmith/commit/99c77d16b7219874f995985160b249d5398b3ef3))
+
+v1.0.3 built armsmith-1.0.3.tar.gz and the wheel — the log says 'Successfully built' — and then
+  shipped a Release page with zero downloads. upload_to_vcs_release is honoured by
+  semantic-release's 'publish' command, not by 'version', and the action only runs 'version'. So the
+  artifacts were produced and discarded.
+
+Adds publish-action@v9, gated on released == 'true' so it is a no-op on runs that cut nothing. PyPI
+  is unaffected either way: that job does its own build.
+
+
 ## v1.0.3 (2026-08-09)
 
 ### Bug Fixes
