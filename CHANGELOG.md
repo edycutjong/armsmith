@@ -1,6 +1,63 @@
 # CHANGELOG
 
 
+## v1.2.2 (2026-08-09)
+
+### Bug Fixes
+
+- **rules**: Stop R4 suggesting a patch it cannot prove; resolve R12 matrix vars
+  ([`d59b8d7`](https://github.com/edycutjong/armsmith/commit/d59b8d7361b41488374253390aa7b091609bbed2))
+
+Two false-positive classes, both found by pointing the tool at real repos.
+
+R4 — the surviving finding still carried the corrupting patch. The dtype guard cut TGI from 5
+  findings to 1, but that one printed "add dtype=np.float32" for np.array(adapter_indices) — exactly
+  the edit the rule's own docstring warns would break an index array. Reporting the call is right;
+  suggesting that fix for it is not. Calls are now classified PROVEN (the constructor or a literal
+  payload guarantees float64) vs UNPROVABLE (a name whose element type we cannot see). PROVEN keeps
+  the mechanical patch. UNPROVABLE is reported as a question - "CONFIRM the payload is float before
+  pinning dtype ... leave this call alone" - and Fix.kind becomes "advisory" when nothing is
+  provable.
+
+Also recognises integer comprehensions: np.array of a range comprehension is int64, and was being
+  flagged on vllm.
+
+R12 — an unresolved matrix expression was reported as a match. The platforms input was read
+  literally, so llama.cpp was told it had no arm64 while its matrix explicitly includes linux/arm64.
+  The rule now resolves matrix paths against the job's own strategy block (including include:
+  entries). When the matrix is built at runtime and cannot be resolved, the rule stays SILENT and
+  says so rather than guessing - silence beats a false positive. Status gates on locations, not
+  evidence, so those notes cannot make the rule fire.
+
+Verified on the repos that exposed them: llama.cpp CLEAN, TGI still MATCHED on its genuinely
+  amd64-only build, vllm's comprehension no longer flagged. 429 tests, 100% coverage.
+
+Also in this commit — provenance labelling, which had drifted:
+
+- cli.py printed the REPLAY MODE / synthetic banner unconditionally. It now reads
+  report["synthetic"], so a recorded bundle gets "RECORDED - real observations captured on a host"
+  instead of being called fabricated. - The PR body stamped "SYNTHETIC DATA" on any replayed report,
+  including bundles whose manifest says synthetic:false. - README claimed "every other report
+  carries mode replay + synthetic true", contradicting the provenance table twelve sections earlier.
+  - The live-measurement table is pinned to the run it came from (31301665280) with that run's real
+  figures, and now says out loud why the last digits move between runs: the job re-measures on every
+  push, and a number that never drifted would be a number nobody was measuring.
+
+CI: the arm64 job now runs record -> diagnose. Everywhere else in CI the probe rules read fixtures
+  we wrote; on that runner lscpu and the THP sysfs node genuinely exist, so it is the only place a
+  bundle can come from observations nobody authored. The step asserts synthetic:false and that lscpu
+  was really captured, so a green tick cannot mean "captured nothing".
+
+UX: `armsmith --version` works (it is what people type first); `doctor` fails ONCE with the complete
+  working invocation instead of teaching itself through two consecutive errors; action.yml and the
+  README Action snippet now say that `replay:` points at a bundle in YOUR repo and show how to
+  record one.
+
+Kitchen leak: rule packs, detectors and generated migration cards cited crawl/clean/sdk_*.md -
+  private research paths absent from this repo. Replaced with the public upstream docs they
+  summarise.
+
+
 ## v1.2.1 (2026-08-09)
 
 ### Bug Fixes
