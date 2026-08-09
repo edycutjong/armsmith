@@ -569,7 +569,8 @@ DX clause and the rubric's reusable-artifacts Impact:
   exact `detect()` signature).
 - **Public signed-report schema** — [`schema/report.schema.json`](src/armsmith/schema/report.schema.json)
   (draft 2020-12, CI-validated). Build your own viewer/CI gate against it.
-- **Importable methodology modules** — `from armsmith.benchstats import compare` (median-of-N/MAD/
+- **Importable methodology modules** — `from armsmith.benchstats import compare` — full API
+  reference in [`docs/API.md`](docs/API.md) (median-of-N/MAD/
   noise-band), `armsmith.gate`, `armsmith.report`, `armsmith.witness` — no CLI required.
 - **Drop-in Arm CI gate** — `uses: edycutjong/armsmith@v1` on `runs-on: ubuntu-24.04-arm` (see
   [`action.yml`](action.yml)); the Marketplace *listing* is publish-pending, never claimed as live.

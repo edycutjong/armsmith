@@ -215,7 +215,17 @@ def render_markdown(
     else:
         out.append("Report unsigned (run `armsmith keys init` and re-run with --sign).")
     out.append("")
-    out.append("CI attestation verify (keyless, GitHub OIDC — command for judges; TODO(S1) wiring):")
+    out.append(
+        "**Verify it yourself — offline, no trust required:** `armsmith verify report.json` "
+        "re-derives every statistic and every gate verdict from the raw samples embedded "
+        "above. Change one digit and it prints `VERIFY FAILED`."
+    )
+    out.append("")
+    out.append(
+        "Sigstore/cosign attestation is not wired yet — the ed25519 signature and that "
+        "recompute are what this report stands on today. The cosign invocation is shown "
+        "for reference only:"
+    )
     out.append("```")
     out.append(cosign_verify_line(repo_slug=repo_slug))
     out.append("```")
