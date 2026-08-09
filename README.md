@@ -119,7 +119,7 @@ disagreement makes the rule refuse to diagnose.
 | Report schema | `jsonschema` (draft 2020-12) | public contract, CI-validated — build your own viewer against it |
 | Live Arm bench | GCC + binutils `objdump` on aarch64 | compile A/B from one source, then count SDOT in the disassembly |
 | CI | GitHub Actions — `ubuntu-24.04-arm` · `ubuntu-22.04-arm` · `ubuntu-latest` × Py 3.11/3.12 | native arm64 legs, free, no hardware to rent |
-| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 234 tests, ~93% coverage |
+| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 234 tests, 87% line coverage |
 
 ## 🏆 Arm Integration (Cloud AI Track)
 
@@ -176,7 +176,7 @@ jobs:
 
 | metric | value |
 |---|---|
-| Tests | **234** passing, ~93% line coverage |
+| Tests | **234** passing, **87%** line coverage |
 | CI jobs per push | 8 — incl. **5 native arm64** (4 test legs + 1 live bench) |
 | Rules | 13, each with a citation + positive/negative fixtures |
 | Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
@@ -310,7 +310,7 @@ The replay harness is hardware-free and runs in under a second locally; the live
 ```bash
 .venv/bin/pip install -e '.[dev]'
 
-.venv/bin/python -m pytest -q               # 234 tests, ~93% line coverage
+.venv/bin/python -m pytest -q               # 234 tests, 87% line coverage
 .venv/bin/ruff check .                      # lint gate (clean)
 .venv/bin/mypy src                          # types — advisory, not a gate
 .venv/bin/python scripts/verify_offline.py  # scan → gate → sign → verify, end-to-end
@@ -328,7 +328,7 @@ is where the numbers in [Measured on Real Arm Silicon](#measured-on-real-arm-sil
 
 | layer | tool | status |
 |---|---|---|
-| unit + replay suite | pytest (234 tests, ~93% cov) | ✅ green, offline |
+| unit + replay suite | pytest (234 tests, 87% cov) | ✅ green, offline |
 | lint | ruff | ✅ gate |
 | types | mypy | ✅ advisory (`continue-on-error`) |
 | end-to-end loop | `verify_offline.py` | ✅ scan → gate → sign → verify |
