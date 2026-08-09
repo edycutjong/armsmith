@@ -98,13 +98,14 @@ def test_rules_never_ship_half_a_snippet():
 def test_actionable_rules_carry_a_paste_able_diff():
     """The cards are advertised as migration templates, so most must contain code.
 
-    R9 and R13 are diagnostic — they redirect where you optimize rather than
-    naming a specific edit — so they honestly carry no snippet.
+    R13 is diagnostic — it quantifies the kernel-vs-pipeline split and
+    redirects where you optimize rather than naming a specific edit — so it
+    honestly carries no snippet.
     """
     from armsmith.rules import load_pack
 
     specs = load_pack()
-    diagnostic = {"R9", "R13"}
+    diagnostic = {"R13"}
     with_snippet = {rid for rid, s in specs.items() if s.has_snippet}
     assert with_snippet == set(specs) - diagnostic
     for rid in with_snippet:

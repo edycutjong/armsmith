@@ -647,7 +647,7 @@ html.js .reveal.d3{transition-delay:.24s}
         <div class="l">measured on Neoverse&#8209;N2 · <code class="mono">SDOT 0 → 1</code></div>
       </div>
       <div class="hstat" role="listitem">
-        <div class="n mono">429</div>
+        <div class="n mono">447</div>
         <div class="l">tests passing · fully offline</div>
       </div>
       <div class="hstat" role="listitem">
@@ -916,8 +916,8 @@ html.js .reveal.d3{transition-delay:.24s}
         <p class="k">migration templates</p>
         <h3>13 x86 → Arm migration templates</h3>
         <p><code>armsmith rules export --format md</code> renders one card per rule — anti-pattern ·
-        <b>paste-able before→after diff</b> · fix · citation — reusable on any repo. 11 of 13 carry a
-        diff; R9 and R13 are diagnostic and carry none rather than an invented one. Add a 14th rule
+        <b>paste-able before→after diff</b> · fix · citation — reusable on any repo. 12 of 13 carry a
+        diff; R13 is diagnostic and carries none rather than an invented one. Add a 14th rule
         with one YAML descriptor, one detector and one import — the engine itself doesn't change.</p>
         <div class="rules-grid" aria-label="The 13 aarch64 anti-pattern rules">
           <span class="rule"><b>R1</b><span>amd64 pin → QEMU</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
@@ -999,7 +999,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="cmd">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="cmd">pip install -e '.[dev]'</span>
 
-<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 429 passing, fully offline</span>
+<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 447 passing, fully offline</span>
 <span class="cmd">armsmith scan fixtures/replays/scenario_ragserve</span>               <span class="c"># static R1/R4/R12 — zero hardware</span>
 <span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>  <span class="c"># full gate: 4 kept, 2 dropped</span>
 <span class="cmd">armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt</span>  <span class="c"># ISA proof: 0 → 4 dotprod</span>
@@ -1051,7 +1051,7 @@ html.js .reveal.d3{transition-delay:.24s}
       <details>
         <summary><span class="qno mono">Q1</span>Do I need Arm hardware to validate any of this?</summary>
         <div class="a"><p>No. The judge quickstart runs on any x86 laptop in about two minutes, fully offline
-        beyond <code>pip</code>: 429 tests, the static scan, the full replay reproduce gate, the ISA witness,
+        beyond <code>pip</code>: 447 tests, the static scan, the full replay reproduce gate, the ISA witness,
         <code>verify</code>, and the CI twin — all exit 0 with no Arm box and no network.</p></div>
       </details>
       <details>
@@ -1144,7 +1144,7 @@ html.js .reveal.d3{transition-delay:.24s}
         <h3>Fine print</h3>
         <ul>
           <li><span class="dim">MIT license · submitted on Devpost as <b>Armsmith</b></span></li>
-          <li><span class="dim">429 tests · fully offline · 100% line coverage</span></li>
+          <li><span class="dim">447 tests · fully offline · 100% line coverage</span></li>
           <li><span class="dim">Live Arm leg measured on Neoverse&#8209;N2 · no throughput multiplier extrapolated to your model</span></li>
           <li><span class="dim">Replay data is synthetic and labeled at every layer</span></li>
         </ul>

@@ -8,6 +8,7 @@ Commands:
   pr <report.json>             assemble the bot PR (dry-run); live posting is TODO(S1)
   ci --replay <bundle>         reproduce-gate as an exit-code CI twin (fails on regression)
   bench-live                   LIVE gate on real Arm silicon: compile A/B, witness SDOT, measure
+  bench-cmd                    the same gate, pointed at YOUR before/after commands
   rules list | rules explain   the 13-rule pack with citations
   verify <report.json>         hash + ed25519 + recompute-stats verification
   keys init                    generate the local ed25519 signing keypair
@@ -16,6 +17,7 @@ Commands:
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import typer
@@ -330,6 +332,151 @@ def witness(
     console.print(table)
     for line in witness_delta(wb, wa):
         console.print(f"  {line}")
+
+
+# ---------------------------------------------------------------------------
+# bench-cmd  (the reproduce gate, pointed at YOUR workload)
+# ---------------------------------------------------------------------------
+
+@app.command("bench-cmd")
+def bench_cmd(
+    baseline_cmd: str = typer.Option(..., "--baseline-cmd", help="Command to run BEFORE your change."),
+    candidate_cmd: str = typer.Option(..., "--candidate-cmd", help="Command to run AFTER your change."),
+    out: Path = typer.Option(Path("report-cmd.json"), "--out", "-o", help="Report output path."),
+    markdown: Path | None = typer.Option(None, "--markdown", help="Also write the evidence markdown here."),
+    rounds: int = typer.Option(7, "--rounds", min=3, help="Measured rounds per side."),
+    warmup: int = typer.Option(1, "--warmup", min=0, help="Discarded warmup rounds per side."),
+    timeout: int = typer.Option(900, "--timeout", min=1, help="Per-run timeout in seconds."),
+    cwd: Path | None = typer.Option(None, "--cwd", exists=True, file_okay=False, help="Directory to run the commands in."),
+    rule_id: str | None = typer.Option(None, "--rule", help="Rule id this change implements (e.g. R3), recorded in the report."),
+    instance: str = typer.Option("unknown", "--instance", help="Host label recorded in the report."),
+    scenario: str = typer.Option("cmd-gate", "--scenario", help="Scenario name recorded in the report."),
+    sign: bool = typer.Option(True, "--sign/--no-sign", help="ed25519-sign the report."),
+    key_dir: Path | None = typer.Option(None, "--key-dir", help="Key directory (default ~/.armsmith)."),
+    strict: bool = typer.Option(False, "--strict", help="Exit non-zero unless the gate says keep."),
+) -> None:
+    """Put YOUR OWN before/after commands through the reproduce gate.
+
+    Same statistics as everything else here: ABAB interleaving, median-of-N, a
+    scaled-MAD noise band, output-hash equality, and a signed report `armsmith
+    verify` re-derives from the embedded samples. An improvement inside the band
+    is reported as no change, never as a win.
+
+    This is a stopwatch, so it carries NO ISA witness — `bench-live` is the one
+    that disassembles binaries and counts SDOT. It refuses to run off aarch64,
+    because a wall-clock number from an x86 box is not an Arm result."""
+    from . import report as report_mod
+    from .benchcmd import METRIC, run_command_bench
+    from .evidence import render_markdown
+    from .fingerprint import capture_fingerprint
+    from .gate import GateConfig, run_gate
+    from .keys import KeyError_
+    from .livebench import ToolchainError
+    from .probes import LiveProbe
+
+    try:
+        res = run_command_bench(
+            baseline_cmd, candidate_cmd, rule_id=rule_id, measured_rounds=rounds,
+            warmup=warmup, timeout=timeout, cwd=str(cwd) if cwd else None,
+        )
+    except (ToolchainError, ValueError) as exc:
+        err_console.print(f"bench-cmd failed: {exc}")
+        raise typer.Exit(code=2)
+    except subprocess.TimeoutExpired as exc:
+        err_console.print(f"bench-cmd timed out after {exc.timeout}s: {exc.cmd}")
+        raise typer.Exit(code=2)
+
+    console.print(
+        f"[bold green]LIVE MODE[/bold green] — your commands, timed on this host "
+        f"({res.machine}/{res.system}). Nothing below is synthetic."
+    )
+    console.print(
+        "[dim]no ISA witness in command mode — this is a stopwatch; "
+        "use `armsmith bench-live` for the instruction-level proof[/dim]"
+    )
+
+    probe = LiveProbe("local")
+    host = None
+    if probe.has("lscpu"):
+        host = capture_fingerprint(probe, {"instance": instance})
+
+    cfg = GateConfig(primary_metrics=(METRIC,))
+    outcome = run_gate(
+        res.baseline.to_measurement(), [res.candidate.to_measurement()], cfg
+    )
+    fix = outcome.results[0]
+    cmp = fix.comparisons.get(METRIC)
+
+    gt = Table(title="Reproduce gate (your workload)")
+    gt.add_column("field")
+    gt.add_column("value", overflow="fold")
+    gt.add_row("baseline", escape(baseline_cmd))
+    gt.add_row("candidate", escape(candidate_cmd))
+    if cmp:
+        gt.add_row("baseline median", f"{cmp.baseline.median:.6f} s")
+        gt.add_row("candidate median", f"{cmp.candidate.median:.6f} s")
+        gt.add_row("Δ", f"{cmp.delta:+.6f} s" + (f" ({cmp.delta_pct:+.2f}%)" if cmp.delta_pct is not None else ""))
+        gt.add_row("noise band", f"±{cmp.band:.6f} s (k={cmp.band_k:g})")
+        gt.add_row("verdict", cmp.verdict.value)
+    gt.add_row("outputs identical", "yes" if res.outputs_agree else "NO")
+    color = "green" if fix.verdict == "keep" else "red"
+    gt.add_row("gate", f"[{color}]{fix.verdict}[/{color}]")
+    console.print(gt)
+    for reason in fix.reasons:
+        console.print(f"  • {escape(reason)}")
+
+    # A finding is a RULE's verdict. An operator-driven A/B has no rule behind
+    # it, so it emits none rather than inventing a placeholder id — the schema
+    # requires ^R\d+$ and, more to the point, a fake rule id in a signed report
+    # is exactly the kind of thing this tool exists not to do. The commands are
+    # recorded in artifacts.workload either way.
+    findings = []
+    if rule_id:
+        findings.append({
+            "rule_id": rule_id,
+            "status": "matched",
+            "evidence": [
+                f"baseline command: {baseline_cmd}",
+                f"candidate command: {candidate_cmd}",
+            ],
+            "locations": [res.cwd],
+            "fix": None,
+            "skipped_reason": None,
+        })
+    rpt = report_mod.build_report(
+        mode="live",
+        synthetic=False,
+        scenario=scenario,
+        repo={"url": res.cwd, "sha": "n/a"},
+        host=host,
+        findings=findings,
+        outcome=outcome,
+        gate_config=cfg,
+        plan=([{"rule_id": rule_id, "reason": "operator-supplied before/after commands"}]
+              if rule_id else []),
+        artifacts=res.artifacts_dict(),
+        cost={"cost_usd": 0.0, "note": "measured on the operator's own host"},
+    )
+
+    sign_note = None
+    if sign:
+        try:
+            rpt = report_mod.sign_report(rpt, key_dir=key_dir)
+        except KeyError_ as exc:
+            sign_note = f"report left unsigned: {exc}"
+    report_mod.write_report(rpt, out)
+    sig = rpt.get("signature")
+    if sig:
+        console.print(f"report → {out}  [green]signed[/green] sha256:{sig['report_sha256'][:16]}…")
+    else:
+        console.print(f"report → {out}  [yellow]UNSIGNED[/yellow] ({sign_note or 'signing disabled'})")
+
+    if markdown:
+        markdown.write_text(render_markdown(rpt), encoding="utf-8")
+        console.print(f"evidence → {markdown}")
+
+    if strict and fix.verdict != "keep":
+        raise typer.Exit(code=1)
 
 
 # ---------------------------------------------------------------------------

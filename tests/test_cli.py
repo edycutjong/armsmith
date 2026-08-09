@@ -2,6 +2,7 @@
 
 import json
 
+import pytest
 from tests.conftest import FIXTURES
 from typer.testing import CliRunner
 
@@ -364,3 +365,162 @@ def test_diagnose_banner_reports_provenance_not_transport(tmp_path, monkeypatch)
                                "--no-sign", "--out", str(tmp_path / "r2.json")])
     assert "REPLAY MODE" in res2.output
     assert "synthetic fixture data" in res2.output
+
+
+# --- bench-cmd: the gate pointed at the operator's own workload ---------------
+
+@pytest.fixture
+def _arm(monkeypatch):
+    from armsmith import benchcmd
+    monkeypatch.setattr(benchcmd.platform, "machine", lambda: "aarch64")
+    monkeypatch.setattr(benchcmd.platform, "system", lambda: "Linux")
+
+
+def _pycmd(body):
+    import sys
+    return f'{sys.executable} -c "{body}"'
+
+
+def test_bench_cmd_gates_two_commands_and_writes_a_signed_shaped_report(tmp_path, _arm):
+    out, md = tmp_path / "r.json", tmp_path / "e.md"
+    res = runner.invoke(app, [
+        "bench-cmd",
+        "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--no-sign",
+        "--out", str(out), "--markdown", str(md), "--scenario", "unit",
+    ])
+    assert res.exit_code == 0, res.output
+    assert "LIVE MODE" in res.output
+    assert "no ISA witness in command mode" in res.output   # never implied
+
+    rpt = json.loads(out.read_text())
+    assert rpt["mode"] == "live" and rpt["synthetic"] is False
+    assert rpt["artifacts"]["isa_witness"]["available"] is False
+    assert md.exists()
+
+
+def test_bench_cmd_refuses_off_arm_with_exit_2(monkeypatch, tmp_path):
+    from armsmith import benchcmd
+    monkeypatch.setattr(benchcmd.platform, "machine", lambda: "x86_64")
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"), "--out", str(tmp_path / "r.json"),
+    ])
+    assert res.exit_code == 2
+
+
+def test_bench_cmd_strict_exits_nonzero_when_the_gate_drops(tmp_path, _arm):
+    """Two identical commands cannot beat the noise band, so the gate drops."""
+    res = runner.invoke(app, [
+        "bench-cmd",
+        "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--no-sign", "--strict",
+        "--out", str(tmp_path / "r.json"),
+    ])
+    assert res.exit_code == 1
+    assert "drop" in res.output
+
+
+def test_bench_cmd_reports_a_broken_command_rather_than_timing_it(tmp_path, _arm):
+    res = runner.invoke(app, [
+        "bench-cmd",
+        "--baseline-cmd", _pycmd("import sys; sys.exit(3)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--no-sign",
+        "--out", str(tmp_path / "r.json"),
+    ])
+    assert res.exit_code == 2
+    assert "bench-cmd failed" in res.output
+
+
+def test_bench_cmd_surfaces_a_timeout(tmp_path, _arm, monkeypatch):
+    import subprocess as sp
+
+    from armsmith import benchcmd
+
+    def boom(*a, **k):
+        raise sp.TimeoutExpired(cmd="sleep", timeout=1)
+    monkeypatch.setattr(benchcmd.subprocess, "run", boom)
+
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"), "--no-sign",
+        "--out", str(tmp_path / "r.json"),
+    ])
+    assert res.exit_code == 2
+    assert "timed out" in res.output
+
+
+def test_bench_cmd_signs_the_report_when_keys_exist(tmp_path, _arm):
+    kd = str(tmp_path / "keys")
+    runner.invoke(app, ["keys", "init", "--key-dir", kd])
+    out = tmp_path / "signed.json"
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--key-dir", kd, "--out", str(out),
+    ])
+    assert res.exit_code == 0, res.output
+    assert "signed" in res.output
+    assert json.loads(out.read_text())["signature"]["report_sha256"]
+
+    # And verify re-derives it, like every other report this tool emits.
+    v = runner.invoke(app, ["verify", str(out)])
+    assert v.exit_code == 0, v.output
+    assert "VERIFY OK" in v.output
+
+
+def test_bench_cmd_reports_unsigned_rather_than_failing_without_keys(tmp_path, _arm):
+    out = tmp_path / "unsigned.json"
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0",
+        "--key-dir", str(tmp_path / "absent"), "--out", str(out),
+    ])
+    assert res.exit_code == 0, res.output
+    assert "UNSIGNED" in res.output
+    assert "keys init" in res.output          # tells you how to fix it
+
+
+def test_bench_cmd_fingerprints_the_host_when_lscpu_is_available(tmp_path, _arm, monkeypatch):
+    """On a real Arm box lscpu exists, and the report carries the host block."""
+    from armsmith import probes
+
+    lscpu = (
+        "Architecture:  aarch64\nCPU(s): 4\nVendor ID: ARM\n"
+        "Model name: Neoverse-N2\nFlags: asimddp i8mm sve\n"
+    )
+    monkeypatch.setattr(probes.LiveProbe, "has", lambda self, kind: kind == "lscpu")
+    monkeypatch.setattr(probes.LiveProbe, "text", lambda self, kind: lscpu)
+
+    out = tmp_path / "host.json"
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--no-sign",
+        "--instance", "c8g.4xlarge", "--out", str(out),
+    ])
+    assert res.exit_code == 0, res.output
+    host = json.loads(out.read_text())["host"]
+    assert host["model_name"] == "Neoverse-N2"
+    assert host["instance"] == "c8g.4xlarge"
+
+
+def test_bench_cmd_with_a_rule_id_records_a_finding_and_still_verifies(tmp_path, _arm):
+    kd = str(tmp_path / "k")
+    runner.invoke(app, ["keys", "init", "--key-dir", kd])
+    out = tmp_path / "ruled.json"
+    res = runner.invoke(app, [
+        "bench-cmd", "--baseline-cmd", _pycmd("print(1)"),
+        "--candidate-cmd", _pycmd("print(1)"),
+        "--rounds", "3", "--warmup", "0", "--rule", "R3",
+        "--key-dir", kd, "--out", str(out),
+    ])
+    assert res.exit_code == 0, res.output
+    rpt = json.loads(out.read_text())
+    assert rpt["findings"][0]["rule_id"] == "R3"
+    assert rpt["plan"][0]["rule_id"] == "R3"
+    assert runner.invoke(app, ["verify", str(out)]).exit_code == 0

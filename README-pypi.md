@@ -67,6 +67,18 @@ host cannot observe is **omitted, not guessed** — the rules that needed it rep
 probe named. `env` and `proc_maps` are never captured at all: a bundle is a published artifact, and
 those carry CI tokens and host paths.
 
+**Gate your own change.** Give it your before and after command and it runs the same statistics —
+ABAB interleaving, median-of-N, a scaled-MAD noise band, output-hash equality, a signed report. A
+delta inside the band is reported as *no change*, never as a win:
+
+```bash
+armsmith bench-cmd --rule R3 \
+  --baseline-cmd "python serve_bench.py --config before.yaml" \
+  --candidate-cmd "python serve_bench.py --config after.yaml"
+```
+
+It refuses to run off `aarch64`, and it carries no ISA witness — it is a stopwatch, and says so.
+
 **Take the measurement yourself**, on any `aarch64` box (a free GitHub `ubuntu-24.04-arm` runner is
 enough). It refuses to run anywhere else rather than produce an Arm number off Arm hardware:
 

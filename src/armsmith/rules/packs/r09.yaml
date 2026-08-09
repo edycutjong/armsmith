@@ -21,3 +21,19 @@ gain_note: >
 citation_url: https://perf.wiki.kernel.org/index.php/Tutorial
 confidence: low
 learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama_cpp_streamline/
+snippet_lang: python
+before: |
+  # per-token slicing: every token reallocates and copies
+  out = b""
+  for tok in tokens:
+      out += table[tok].encode()        # O(n^2) copies
+  return out
+after: |
+  # pre-size once, write into a view: no reallocation, no copy storm
+  parts = [table[tok].encode() for tok in tokens]
+  buf = bytearray(sum(map(len, parts)))
+  view, off = memoryview(buf), 0
+  for p in parts:
+      view[off:off + len(p)] = p
+      off += len(p)
+  return bytes(buf)
