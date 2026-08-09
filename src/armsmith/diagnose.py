@@ -92,6 +92,10 @@ def run_replay_diagnosis(
     repo_meta = dict(manifest.extra.get("repo", {})) if isinstance(manifest.extra.get("repo"), dict) else {}
     rpt = report_mod.build_report(
         mode="replay",
+        # Provenance comes from the bundle, never from the transport. A bundle
+        # written by `armsmith record` is replayed but real; stamping it
+        # synthetic would understate a genuine measurement.
+        synthetic=manifest.synthetic,
         scenario=manifest.scenario,
         repo={"url": repo_meta.get("url", f"replay:{bundle_dir.name}"), "sha": repo_meta.get("sha", "n/a")},
         host=host,

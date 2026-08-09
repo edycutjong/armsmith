@@ -97,12 +97,23 @@ def build_report(
     cost: dict[str, Any] | None = None,
     run_id: str | None = None,
     created_at: str | None = None,
+    synthetic: bool | None = None,
 ) -> dict:
-    """Assemble the report dict (unsigned)."""
+    """Assemble the report dict (unsigned).
+
+    ``mode`` is how the observations reached us (replayed from a bundle vs
+    measured live in-process). ``synthetic`` is whether they were ever real.
+    They are NOT the same axis: a bundle written by ``armsmith record`` is
+    replayed but entirely real, and labelling it synthetic would understate
+    genuine measurements just as badly as the reverse would overstate them.
+    Callers pass the bundle manifest's own flag; the fallback preserves the
+    original behaviour for callers that do not know.
+    """
     if mode not in ("replay", "live"):
         raise ValueError(f"mode must be replay|live, got {mode!r}")
     cfg = gate_config or GateConfig()
-    synthetic = mode == "replay"
+    if synthetic is None:
+        synthetic = mode == "replay"
 
     fixes: list[dict] = []
     baseline_block = None

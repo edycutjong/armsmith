@@ -2,6 +2,7 @@
 
 Commands:
   scan <repo_dir>              static-only aarch64 anti-pattern scan (R1/R4/R12), zero hardware
+  record <repo> --out <dir>    capture a REAL bundle from this host (manifest: synthetic=false)
   diagnose --replay <bundle>   full offline loop: scan → plan → gate → signed report
   witness <before> <after>     ISA-witness: count SDOT/UDOT/SMMLA/USMMLA before vs after
   pr <report.json>             assemble the bot PR (dry-run); live posting is TODO(S1)
@@ -176,6 +177,90 @@ def scan(
     )
     if strict and matched:
         raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# record  (write a REAL replay bundle from this host)
+# ---------------------------------------------------------------------------
+
+@app.command()
+def record(
+    repo_dir: Path = typer.Argument(
+        ..., exists=True, file_okay=False, metavar="REPO_DIR",
+        help="The repo to record a bundle for. Copied into the bundle so the static "
+             "rules can run against it offline later.",
+    ),
+    out: Path = typer.Option(
+        ..., "--out", "-o", file_okay=False,
+        help="Bundle directory to write (created if absent).",
+    ),
+    scenario: str = typer.Option("", "--scenario", help="Bundle name; defaults to the repo dir."),
+    note: str = typer.Option("", "--note", help="Free-text note stored in the manifest."),
+    python: str = typer.Option(
+        "", "--python",
+        help="Interpreter to probe for numpy's BLAS (R3). Point this at the venv that "
+             "actually serves your model — armsmith's own does not depend on numpy.",
+    ),
+    copy_repo: bool = typer.Option(
+        True, "--copy-repo/--no-copy-repo", help="Copy the repo into the bundle."
+    ),
+    build_log: Path = typer.Option(None, "--build-log", help="Real compiler output → unlocks R2."),
+    pip_log: Path = typer.Option(None, "--pip-log", help="Real `pip install` log → unlocks R8."),
+    cmake_cache: Path = typer.Option(None, "--cmake-cache", help="CMakeCache.txt → unlocks R10."),
+    gguf: Path = typer.Option(None, "--gguf", help="GGUF file header → unlocks R5."),
+    perf: Path = typer.Option(None, "--perf", help="`perf report` output → unlocks R9."),
+    llama_bench: Path = typer.Option(None, "--llama-bench", help="llama-bench JSON → R13 (with --hyperfine)."),
+    hyperfine: Path = typer.Option(None, "--hyperfine", help="hyperfine JSON → R13 (with --llama-bench)."),
+    ort_session: Path = typer.Option(None, "--ort-session", help="Recorded SessionOptions JSON → unlocks R7."),
+) -> None:
+    """Record a REAL replay bundle from this host — the input `diagnose --replay` wants.
+
+    Captures what this machine can honestly report (lscpu, THP state, numpy's BLAS
+    configuration) and copies in any real instrument artifacts you already have. Nothing
+    is fabricated: a probe that cannot be observed is omitted, and the rules needing it
+    will say `skipped` with a reason. `env` and `proc_maps` are never captured — a bundle
+    is something you publish, and those carry secrets and host paths."""
+    from .record import INGEST_KINDS, record_bundle
+
+    supplied = {
+        "build_log": build_log, "pip_log": pip_log, "cmake_cache": cmake_cache,
+        "gguf": gguf, "perf": perf, "llama_bench": llama_bench,
+        "hyperfine": hyperfine, "ort_session": ort_session,
+    }
+    ingest = {INGEST_KINDS[opt]: path for opt, path in supplied.items() if path is not None}
+
+    result = record_bundle(
+        repo_dir, out, scenario=scenario or None, ingest=ingest,
+        copy_repo=copy_repo, note=note, python=python or None,
+    )
+
+    table = Table(title=f"Recorded bundle — {result.bundle_dir}")
+    table.add_column("probe")
+    table.add_column("status")
+    table.add_column("source / reason", overflow="fold")
+    table.add_column("rules")
+    for cap in result.captures:
+        style, label = ("green", "captured") if cap.captured else ("dim", "absent")
+        table.add_row(
+            cap.kind, f"[{style}]{label}[/{style}]",
+            escape(cap.source or cap.reason), ", ".join(cap.rules) or "—",
+        )
+    console.print(table)
+
+    enabled = result.rules_enabled
+    console.print(
+        f"bundle: [green]{len(result.captured_kinds)} probes captured[/green] · "
+        f"manifest declares [bold]\"synthetic\": false[/bold] "
+        f"({'repo copied' if result.repo_copied else 'no repo copy'})"
+    )
+    console.print(
+        "probe rules this bundle can answer: "
+        + (f"[green]{', '.join(enabled)}[/green]" if enabled else "[dim]none[/dim]")
+        + " · static rules R1/R4/R12 always run"
+    )
+    console.print(
+        f"next: [bold]armsmith diagnose --replay {result.bundle_dir}[/bold]"
+    )
 
 
 # ---------------------------------------------------------------------------

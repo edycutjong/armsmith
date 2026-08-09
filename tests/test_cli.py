@@ -228,3 +228,68 @@ def test_doctor_offline_lscpu_file():
 def test_doctor_offline_without_source_exits_2():
     res = runner.invoke(app, ["doctor", "--offline"])
     assert res.exit_code == 2
+
+
+# --- record ------------------------------------------------------------------
+
+def _repo(tmp_path):
+    d = tmp_path / "svc"
+    d.mkdir()
+    (d / "app.py").write_text("import numpy as np\nx = np.zeros(4)\n")
+    return d
+
+
+def test_record_writes_a_real_bundle_and_reports_what_it_could_not_get(tmp_path, monkeypatch):
+    """The table must show refused/absent probes, not quietly omit them."""
+    from armsmith import record as rec
+
+    monkeypatch.setattr(rec, "_capture_numpy_show_config",
+                        lambda python=None: ("name: openblas64\n", "py -c ..."))
+
+    out = tmp_path / "bundle"
+    res = runner.invoke(app, ["record", str(_repo(tmp_path)), "--out", str(out),
+                              "--scenario", "svc-live"])
+
+    assert res.exit_code == 0, res.output
+    assert '"synthetic": false' in res.output          # the headline claim
+    assert "numpy_show_config" in res.output
+    assert "refused" in res.output                     # env / proc_maps are shown
+    assert "R3" in res.output                          # rules the bundle unlocks
+    assert json.loads((out / "manifest.json").read_text())["synthetic"] is False
+    assert (out / "repo" / "app.py").is_file()
+
+
+def test_record_ingests_supplied_artifacts_and_can_skip_the_repo_copy(tmp_path, monkeypatch):
+    from armsmith import record as rec
+
+    monkeypatch.setattr(rec, "_capture_numpy_show_config",
+                        lambda python=None: (None, "numpy absent"))
+    log = tmp_path / "build.log"
+    log.write_text("gcc -O3 -march=armv8-a k.c\n")
+    out = tmp_path / "bundle2"
+
+    res = runner.invoke(app, ["record", str(_repo(tmp_path)), "--out", str(out),
+                              "--build-log", str(log), "--no-copy-repo",
+                              "--note", "captured on c8g.4xlarge"])
+
+    assert res.exit_code == 0, res.output
+    assert (out / "probes" / "build_log.txt").read_text() == log.read_text()
+    assert not (out / "repo").exists()
+    assert "no repo copy" in res.output
+    assert json.loads((out / "manifest.json").read_text())["note"] == "captured on c8g.4xlarge"
+
+
+def test_record_says_none_when_it_can_capture_nothing(tmp_path, monkeypatch):
+    from armsmith import record as rec
+
+    monkeypatch.setattr(rec, "_capture_numpy_show_config",
+                        lambda python=None: (None, "numpy absent"))
+    monkeypatch.setattr(rec, "LiveProbe", lambda: type("P", (), {"has": lambda s, k: False})())
+
+    out = tmp_path / "bundle3"
+    res = runner.invoke(app, ["record", str(_repo(tmp_path)), "--out", str(out)])
+
+    assert res.exit_code == 0, res.output
+    assert "0 probes captured" in res.output
+    assert "none" in res.output
+    assert list((out / "probes").iterdir()) == []      # nothing invented
