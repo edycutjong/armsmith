@@ -915,9 +915,10 @@ html.js .reveal.d3{transition-delay:.24s}
       <div class="bcard b-wide reveal">
         <p class="k">migration templates</p>
         <h3>13 x86 → Arm migration templates</h3>
-        <p><code>armsmith rules export --format md</code> renders one card per rule — anti-pattern · fix ·
-        citation — reusable on any repo. Add a 14th rule by dropping one YAML descriptor into the pack;
-        zero core changes.</p>
+        <p><code>armsmith rules export --format md</code> renders one card per rule — anti-pattern ·
+        <b>paste-able before→after diff</b> · fix · citation — reusable on any repo. 11 of 13 carry a
+        diff; R9 and R13 are diagnostic and carry none rather than an invented one. Add a 14th rule
+        with one YAML descriptor, one detector and one import — the engine itself doesn't change.</p>
         <div class="rules-grid" aria-label="The 13 aarch64 anti-pattern rules">
           <span class="rule"><b>R1</b><span>amd64 pin → QEMU</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
           <span class="rule"><b>R2</b><span>no -mcpu/-march</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
@@ -934,6 +935,15 @@ html.js .reveal.d3{transition-delay:.24s}
           <span class="rule"><b>R13</b><span>serving overhead</span><i class="lp" role="img" aria-label="Cites an Arm Learning Path" title="Cites an Arm Learning Path"></i></span>
         </div>
         <p class="rules-legend"><span class="lp" aria-hidden="true"></span> cites an Arm Learning Path — 10 of 13; the rest cite the canonical upstream doc.</p>
+      </div>
+      <div class="bcard reveal">
+        <p class="k">one command, no clone</p>
+        <h3>On PyPI — and it records <em>your</em> machine</h3>
+        <p><code>uvx armsmith scan .</code> runs the aarch64 anti-pattern scan on any repo with nothing
+        installed. <code>armsmith record</code> then captures a real bundle from your own host — manifest
+        <code>"synthetic": false</code> — so the probe rules diagnose your code, not our fixtures.
+        Published from CI by <a href="https://github.com/edycutjong/armsmith/releases" rel="noopener">Trusted
+        Publishing</a>, sdist + wheel attached to every release.</p>
       </div>
       <div class="bcard reveal">
         <p class="k">public schema</p>
@@ -978,6 +988,11 @@ html.js .reveal.d3{transition-delay:.24s}
         </div>
 <pre id="qsCode"><span class="c"># scan any repo with no install at all — armsmith is on PyPI</span>
 <span class="cmd">uvx armsmith scan .</span>
+
+<span class="c"># record a REAL bundle from your own machine, then diagnose your own repo</span>
+<span class="c"># (manifest declares "synthetic": false — nothing here is ours)</span>
+<span class="cmd">armsmith record . --out ./bundle --python .venv/bin/python</span>
+<span class="cmd">armsmith diagnose --replay ./bundle</span>
 
 <span class="c"># or clone, to reproduce the full gate against the replay bundles</span>
 <span class="cmd">git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith</span>
@@ -1093,6 +1108,7 @@ html.js .reveal.d3{transition-delay:.24s}
       Then read the 13 migration templates and make your own repo fast on Arm.</p>
       <div class="cta-row">
         <a class="btn btn-forge" href="https://github.com/edycutjong/armsmith">Open the forge on GitHub <span class="arr" aria-hidden="true">↗</span></a>
+        <a class="btn btn-line" href="https://pypi.org/project/armsmith/" rel="noopener">Install from PyPI <span aria-hidden="true">↗</span></a>
         <a class="btn btn-line" href="./deck.html">Pitch deck <span class="arr" aria-hidden="true">→</span></a>
         <a class="btn btn-line" href="https://youtu.be/JsT83BYMWd0" rel="noopener">Watch the 3-min demo <span class="arr" aria-hidden="true">↗</span></a>
       </div>
@@ -1117,6 +1133,8 @@ html.js .reveal.d3{transition-delay:.24s}
         <h3>Project</h3>
         <ul>
           <li><a href="https://github.com/edycutjong/armsmith">GitHub repository ↗</a></li>
+          <li><a href="https://github.com/edycutjong/armsmith/releases" rel="noopener">GitHub Releases — signed sdist + wheel ↗</a></li>
+          <li><a href="https://pypi.org/project/armsmith/" rel="noopener">armsmith on PyPI ↗</a></li>
           <li><a href="./deck.html">Pitch deck</a></li>
           <li><a href="https://arm-ai-optimization-challenge.devpost.com/">Devpost — Arm AI Optimization Challenge ↗</a></li>
           <li><a href="https://youtu.be/JsT83BYMWd0" rel="noopener">Demo video — 3 min ↗</a></li>
