@@ -14,6 +14,7 @@
 
   <br/>
 
+  [![Demo Video](https://img.shields.io/badge/▶_Demo-3_min-ef4444?style=for-the-badge)](https://youtu.be/vq15rK1iCww)
   [![Live Demo](https://img.shields.io/badge/🚀_Live-Demo-06b6d4?style=for-the-badge)](https://armsmith.edycu.dev)
   [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://armsmith.edycu.dev/deck.html)
   [![Built for Arm AI Optimization Challenge](https://img.shields.io/badge/Devpost-Arm_AI_Challenge-8b5cf6?style=for-the-badge)](https://arm-ai-optimization-challenge.devpost.com/)
@@ -393,6 +394,9 @@ DX clause and the rubric's reusable-artifacts Impact:
 
 ## 📽️ Demo Materials
 
+- **Demo video (3 min):** [youtu.be/vq15rK1iCww](https://youtu.be/vq15rK1iCww) — the reproduce gate
+  dropping two of its own fixes on camera, the ISA witness, the tamper test, and the arm64 CI run.
+  Scenes drawn from the replay bundle carry a `[replay]` badge on screen throughout.
 - **Live site:** [armsmith.edycu.dev](https://armsmith.edycu.dev) — deployed straight from
   [`site/`](site/) in this repo, so the page you see is the source you can read.
 - **Pitch deck:** [armsmith.edycu.dev/deck.html](https://armsmith.edycu.dev/deck.html)
