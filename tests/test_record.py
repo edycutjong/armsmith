@@ -153,7 +153,24 @@ def test_ingested_artifact_is_copied_verbatim(tmp_path, repo, monkeypatch):
     res = rec.record_bundle(repo, tmp_path / "b", ingest={"build_log": log})
 
     assert (tmp_path / "b" / "probes" / "build_log.txt").read_text() == log.read_text()
-    assert "R2" in res.rules_enabled
+    # R2 requires build_log AND lscpu. With only the build log captured it must
+    # NOT be listed as answerable — claiming otherwise would overstate what the
+    # bundle can diagnose, which is the one thing this tool must not do.
+    assert "R2" not in res.rules_enabled
+
+
+def test_a_multi_probe_rule_is_enabled_only_when_every_probe_is_present(tmp_path, repo, monkeypatch):
+    _no_numpy(monkeypatch)
+    log = tmp_path / "build.log"
+    log.write_text("gcc -O3 -march=armv8-a foo.c\n")
+
+    _fake_live(monkeypatch, {})                       # no lscpu
+    without = rec.record_bundle(repo, tmp_path / "b1", ingest={"build_log": log})
+    assert "R2" not in without.rules_enabled
+
+    _fake_live(monkeypatch, {"lscpu": "Model name: Neoverse-N2\n"})
+    with_both = rec.record_bundle(repo, tmp_path / "b2", ingest={"build_log": log})
+    assert "R2" in with_both.rules_enabled          # both probes present
 
 
 def test_missing_ingest_file_is_reported_not_fatal(tmp_path, repo, monkeypatch):

@@ -651,7 +651,7 @@ html.js .reveal.d3{transition-delay:.24s}
         <div class="l">second case · <code class="mono">SMMLA 0 → 1</code> (+i8mm) — two instructions, two ISA extensions</div>
       </div>
       <div class="hstat" role="listitem">
-        <div class="n mono">455</div>
+        <div class="n mono">456</div>
         <div class="l">tests passing · fully offline</div>
       </div>
       <div class="hstat" role="listitem">
@@ -1003,7 +1003,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="cmd">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="cmd">pip install -e '.[dev]'</span>
 
-<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 455 passing, fully offline</span>
+<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 456 passing, fully offline</span>
 <span class="cmd">armsmith scan fixtures/replays/scenario_ragserve</span>               <span class="c"># static R1/R4/R12 — zero hardware</span>
 <span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>  <span class="c"># full gate: 4 kept, 2 dropped</span>
 <span class="cmd">armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt</span>  <span class="c"># ISA proof: 0 → 4 dotprod</span>
@@ -1055,7 +1055,7 @@ html.js .reveal.d3{transition-delay:.24s}
       <details>
         <summary><span class="qno mono">Q1</span>Do I need Arm hardware to validate any of this?</summary>
         <div class="a"><p>No. The judge quickstart runs on any x86 laptop in about two minutes, fully offline
-        beyond <code>pip</code>: 455 tests, the static scan, the full replay reproduce gate, the ISA witness,
+        beyond <code>pip</code>: 456 tests, the static scan, the full replay reproduce gate, the ISA witness,
         <code>verify</code>, and the CI twin — all exit 0 with no Arm box and no network.</p></div>
       </details>
       <details>
@@ -1148,7 +1148,7 @@ html.js .reveal.d3{transition-delay:.24s}
         <h3>Fine print</h3>
         <ul>
           <li><span class="dim">MIT license · submitted on Devpost as <b>Armsmith</b></span></li>
-          <li><span class="dim">455 tests · fully offline · 100% line coverage</span></li>
+          <li><span class="dim">456 tests · fully offline · 100% line coverage</span></li>
           <li><span class="dim">Live Arm leg measured on Neoverse&#8209;N2 · no throughput multiplier extrapolated to your model</span></li>
           <li><span class="dim">Replay data is synthetic and labeled at every layer</span></li>
         </ul>

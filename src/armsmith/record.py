@@ -111,16 +111,22 @@ class RecordResult:
 
     @property
     def rules_enabled(self) -> list[str]:
-        """Rules whose every required probe was captured."""
+        """Rules whose EVERY required probe was captured.
+
+        Read straight off the rule pack's own ``requires`` rather than a map
+        maintained by hand here. R2 needs both ``build_log`` and ``lscpu``, and
+        a hand-rolled map that checked only one would claim a rule is available
+        when it is not — the same overstatement this tool refuses everywhere
+        else, just pointed at itself.
+        """
+        from .rules import load_pack
+
         got = set(self.captured_kinds)
-        enabled: set[str] = set()
-        for kind in got:
-            enabled.update(RULES_BY_PROBE.get(kind, ()))
-        # R11 and R13 need two probes each; drop them unless both are present.
-        if not {"thp", "proc_maps"} <= got:
-            enabled.discard("R11")
-        if not {"llama_bench", "hyperfine"} <= got:
-            enabled.discard("R13")
+        enabled = [
+            rid
+            for rid, spec in load_pack(require_detectors=False).items()
+            if spec.requires and set(spec.requires) <= got
+        ]
         return sorted(enabled, key=lambda r: int(r[1:]))
 
 

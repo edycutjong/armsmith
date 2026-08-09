@@ -5,7 +5,7 @@ Thanks for your interest in improving Armsmith! 🎉
 ## Getting Started
 1. Fork the repo and branch from `main`: `git checkout -b feat/your-feature`
 2. Create a virtualenv and install: `python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'`
-3. Run the suite: `python -m pytest -q` (455 tests, fully offline)
+3. Run the suite: `python -m pytest -q` (456 tests, fully offline)
 
 ## Before You Open a PR
 - `ruff check .` passes (lint gate).

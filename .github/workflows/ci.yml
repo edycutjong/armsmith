@@ -57,7 +57,7 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (455 tests, 100% line coverage) with coverage
+      - name: Unit + replay suite (456 tests, 100% line coverage) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
@@ -188,29 +188,52 @@ jobs:
       # end to end, on the target ISA, at zero extra build cost.
       - name: Record a bundle from this Arm host, then diagnose with it
         run: |
+          set -euo pipefail
+          # Produce REAL instrument artifacts on this runner, then hand them to
+          # `record`. Everything below is observed here — nothing is authored.
+          #
+          #   pip-install.log  -> R8 (sdist fallback for perf-critical wheels)
+          #   numpy venv       -> R3 (which BLAS numpy actually linked)
+          #   build.log        -> R2 (was the kernel built with -mcpu/-march?)
+          #   lscpu / THP      -> captured by `record` itself
+          python -m venv /tmp/probe-venv
+          /tmp/probe-venv/bin/pip install -v numpy 2>&1 | tee pip-install.log | tail -3
+          gcc -O3 -march=armv8-a -v -o /tmp/probe-kernel \
+            src/armsmith/bench/int8_dot.c 2> build.log
+          tail -2 build.log
+
           .venv/bin/armsmith record . \
             --out ./arm-bundle \
             --scenario "github-arm64-runner" \
-            --python .venv/bin/python \
-            --no-copy-repo \
+            --python /tmp/probe-venv/bin/python \
+            --pip-log pip-install.log \
+            --build-log build.log \
             --note "captured on a GitHub-hosted ubuntu-24.04-arm runner"
           echo "--- manifest ---"
           cat ./arm-bundle/manifest.json
-          # Fail loudly if the bundle came back empty or mislabelled: a green
-          # tick on a bundle that captured nothing would prove the opposite of
-          # what this step exists to show.
-          .venv/bin/python - <<'PY'
-          import json, sys
-          m = json.load(open("arm-bundle/manifest.json"))
-          assert m["synthetic"] is False, m
-          got = set(m["captured_probes"])
-          missing = {"lscpu"} - got
-          assert not missing, f"expected lscpu on an Arm runner, captured {sorted(got)}"
-          print("captured:", sorted(got), "| rules enabled:", m["rules_enabled"])
-          PY
+
           .venv/bin/armsmith diagnose --replay ./arm-bundle \
             --out report-recorded.json --pr-dry-run
           .venv/bin/armsmith verify report-recorded.json
+
+          # A green tick must not be reachable by a bundle that captured
+          # nothing. Assert the bundle is real, that probe rules were actually
+          # enabled by it, and that rules genuinely RAN rather than all skipping.
+          .venv/bin/python - <<'PY'
+          import json
+          m = json.load(open("arm-bundle/manifest.json"))
+          r = json.load(open("report-recorded.json"))
+          assert m["synthetic"] is False, m
+          got, enabled = set(m["captured_probes"]), set(m["rules_enabled"])
+          assert "lscpu" in got, f"expected lscpu on an Arm runner, got {sorted(got)}"
+          assert enabled, "bundle enabled no probe rules — the real-data path proved nothing"
+          ran = [f for f in r["findings"] if f["status"] != "skipped"]
+          assert len(ran) >= 4, f"only {len(ran)} rules ran with data: {[f['rule_id'] for f in ran]}"
+          print("captured:", sorted(got))
+          print("probe rules enabled:", sorted(enabled))
+          print("rules that RAN on observed data:",
+                {f["rule_id"]: f["status"] for f in ran})
+          PY
       - name: Publish the evidence to the run summary
         if: always()
         run: |
@@ -244,7 +267,7 @@ jobs:
             echo ""
             echo "| stage | what it proved |"
             echo "|---|---|"
-            echo "| 1 · Quality | ruff + mypy + 455 tests at 100% line coverage, on 6 legs (4 native arm64) |"
+            echo "| 1 · Quality | ruff + mypy + 456 tests at 100% line coverage, on 6 legs (4 native arm64) |"
             echo "| 2 · Security | TruffleHog verified-secret scan over full git history · pip-audit |"
             echo "| 3 · Build | wheel installs clean and still finds its rule packs + schema |"
             echo "| 4 · E2E | offline scan → gate → sign → verify, plus the \`armsmith ci\` twin |"
