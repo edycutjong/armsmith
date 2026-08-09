@@ -13,7 +13,7 @@ fix_generator: >
   Add platforms linux/amd64,linux/arm64 to the buildx step (with
   setup-qemu/setup-buildx), or build natively on the free public-repo arm64
   runners (labels ubuntu-24.04-arm / ubuntu-22.04-arm, verified in
-  crawl/clean/sdk_github-arm64-runners.md).
+  GitHub's hosted-runner documentation).
 expected_gain_range: [1.0, 1.0]
 gain_note: >
   Ecosystem/correctness fix: no local speedup is claimed (range pinned to

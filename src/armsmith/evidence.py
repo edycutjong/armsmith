@@ -7,7 +7,7 @@ The table schema is identical in CLI, PR body, and viewer (COMPLEXITY §5):
 plus: replay/synthetic banner, kept and dropped fix sections (drops carry
 their reasons — honesty discipline), rule citations, host fingerprint, and
 the cosign verify-blob footer (COMMAND STRING ONLY — running it is a CI/S1
-concern; see crawl/clean/sdk_cosign.md for the verified invocation shape).
+concern; see the cosign docs for the verified invocation shape).
 """
 
 from __future__ import annotations
@@ -130,12 +130,24 @@ def render_markdown(
 
     out.append(f"## Armsmith diagnosis — `{report.get('scenario', 'unknown')}`")
     out.append("")
-    if mode == "replay" or synthetic:
+    # Provenance and transport are separate axes. `mode` says how the numbers
+    # reached the report; `synthetic` says whether they were ever real. A bundle
+    # from `armsmith record` is replayed but genuine, and stamping it SYNTHETIC
+    # would understate a real measurement — the mirror image of the overclaim
+    # this whole tool exists to prevent.
+    if synthetic:
         out.append(
             "> ⚠️ **REPLAY MODE — SYNTHETIC DATA.** Measurements below come from a "
-            "recorded/synthetic replay bundle used to exercise the pipeline. They are "
-            "NOT hardware results and must not be quoted as such. Live Graviton runs "
-            "land at S1 with the same report format."
+            "synthetic replay bundle used to exercise the pipeline. They are "
+            "NOT hardware results and must not be quoted as such."
+        )
+        out.append("")
+    elif mode == "replay":
+        out.append(
+            "> ● **RECORDED — REAL OBSERVATIONS.** Measurements below were captured on a "
+            "host by `armsmith record` and replayed through the gate; the bundle manifest "
+            "declares `\"synthetic\": false`. Probes that could not be observed were "
+            "omitted, never invented."
         )
         out.append("")
 

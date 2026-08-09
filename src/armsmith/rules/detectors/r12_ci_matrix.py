@@ -11,6 +11,7 @@ arm64 runner label) appears in that workflow.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -33,14 +34,71 @@ def _walk_steps(workflow: dict):
             continue
         for idx, step in enumerate(steps):
             if isinstance(step, dict):
-                yield job_name, runs_on, idx, step
+                yield job_name, runs_on, idx, step, job
 
 
-def _platforms_of(step: dict) -> str:
+#: ${{ matrix.<path> }} — the value is decided by the job's strategy block,
+#: not written literally in the step.
+_MATRIX_EXPR = re.compile(r"\$\{\{\s*matrix\.([A-Za-z0-9_.-]+)\s*\}\}")
+
+
+def _matrix_values(job: dict, path: str) -> list[str]:
+    """Resolve ``matrix.a.b`` to every value it can take in this job.
+
+    Handles the two shapes that actually occur: a plain key (``matrix.platform``)
+    and a key inside a list of objects (``matrix.config.platforms``, which is how
+    llama.cpp declares its Docker matrix). ``include:`` entries are scanned too,
+    since GitHub merges them into the expansion.
+    """
+    strategy = job.get("strategy")
+    matrix = strategy.get("matrix") if isinstance(strategy, dict) else None
+    if not isinstance(matrix, dict):
+        return []
+    keys = path.split(".")
+    found: list[str] = []
+
+    def walk(node, remaining):
+        if not remaining:
+            if node is not None and not isinstance(node, (dict, list)):
+                found.append(str(node))
+            return
+        if isinstance(node, list):
+            for item in node:
+                walk(item, remaining)
+        elif isinstance(node, dict) and remaining[0] in node:
+            walk(node[remaining[0]], remaining[1:])
+
+    for root in (matrix, *(matrix.get("include") or [] if isinstance(matrix.get("include"), list) else ())):
+        if isinstance(root, dict) and keys[0] in root:
+            walk(root[keys[0]], keys[1:])
+    return found
+
+
+def _platforms_of(step: dict, job: dict | None = None) -> tuple[str, str | None]:
+    """Return ``(raw, resolved)`` for a build step's ``platforms`` input.
+
+    ``resolved`` is what the arm64 check should read. It is ``None`` when the
+    value is a matrix expression we cannot resolve — in that case the rule must
+    stay silent rather than guess. Reporting an unresolved ``${{ matrix.* }}``
+    as "no linux/arm64" is a false positive, and it fired on llama.cpp, whose
+    matrix does include ``linux/arm64``.
+    """
     with_block = step.get("with") or {}
-    if isinstance(with_block, dict):
-        return str(with_block.get("platforms", ""))
-    return ""
+    if not isinstance(with_block, dict):
+        return "", ""
+    raw = str(with_block.get("platforms", ""))
+    exprs = _MATRIX_EXPR.findall(raw)
+    if not exprs:
+        return raw, raw
+    if job is None:
+        return raw, None
+    resolved_parts = [raw]
+    for path in exprs:
+        values = _matrix_values(job, path)
+        if not values:
+            return raw, None          # unresolvable — do not guess
+        resolved_parts.extend(values)
+    return raw, " ".join(resolved_parts)
 
 
 def _runs_on_arm(runs_on) -> bool:
@@ -72,16 +130,23 @@ def detect(repo: Path | None, probe, spec: RuleSpec) -> Finding:
         if not isinstance(workflow, dict):
             continue
 
-        for job_name, runs_on, idx, step in _walk_steps(workflow):
+        for job_name, runs_on, idx, step, job in _walk_steps(workflow):
             uses = str(step.get("uses", ""))
             run_cmd = str(step.get("run", ""))
             where = f"{rel}: job '{job_name}' step {idx + 1}"
 
             if uses.startswith("docker/build-push-action"):
                 builds_seen += 1
-                platforms = _platforms_of(step)
-                if "arm64" not in platforms:
-                    shown = platforms or "(unset → runner arch only)"
+                raw, resolved = _platforms_of(step, job)
+                if resolved is None:
+                    # Matrix-driven and not resolvable from this file. Silence
+                    # beats a guess: the matrix may well include arm64.
+                    evidence.append(
+                        f"{where}: platforms={raw} is matrix-driven and could not be "
+                        "resolved statically — not reported"
+                    )
+                elif "arm64" not in resolved:
+                    shown = raw or "(unset → runner arch only)"
                     evidence.append(
                         f"{where}: build-push-action platforms={shown} — no linux/arm64"
                     )
@@ -102,8 +167,11 @@ def detect(repo: Path | None, probe, spec: RuleSpec) -> Finding:
 
     if builds_seen == 0:
         return clean(spec, ["workflows found, but none build/push container images"])
-    if not evidence:
-        return clean(spec, [f"{builds_seen} image-build step(s) all include arm64"])
+    # Gate on locations, not evidence: notes about steps we deliberately did
+    # NOT report (unresolvable matrix expressions, unparseable files) are
+    # recorded as evidence but must never make the rule fire.
+    if not locations:
+        return clean(spec, evidence or [f"{builds_seen} image-build step(s) all include arm64"])
 
     fix = Fix(
         rule_id=spec.id,

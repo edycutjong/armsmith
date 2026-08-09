@@ -223,7 +223,7 @@ def test_r4_records_unparseable_files_as_evidence_and_keeps_scanning(specs, tmp_
     assert f.status is FindingStatus.MATCHED
     assert f.evidence[0] == "a_broken.py: skipped (syntax error at line 1)"
     assert f.evidence[1] == (
-        "b_good.py:3: np.zeros(...) without dtype= — floats default to float64"
+        "b_good.py:3: np.zeros(...) without dtype= — this call returns float64"
     )
     assert f.locations == ("b_good.py:3",)  # the broken file contributes no location
 

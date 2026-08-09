@@ -1,6 +1,6 @@
 # Armsmith CI — runs the hardware-free replay suite on native arm64 + x86.
 # Labels ubuntu-24.04-arm / ubuntu-22.04-arm are the verified free public-repo
-# arm64 runners (crawl/clean/sdk_github-arm64-runners.md). Everything in this
+# arm64 runners (GitHub's hosted-runner documentation). Everything in this
 # suite is replay/fixture-based, so it needs zero Arm-specific setup — the
 # arm64 leg simply proves the package is arch-clean and doubles as the
 # substrate for the S1+ live-bench jobs.
@@ -57,7 +57,7 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (414 tests, 100% line coverage) with coverage
+      - name: Unit + replay suite (429 tests, 100% line coverage) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
@@ -151,6 +151,37 @@ jobs:
             --require-witness
       - name: Verify the live report (hash + ed25519 + schema + recompute)
         run: .venv/bin/armsmith verify report-live.json
+      # The record -> diagnose path on REAL hardware. Everywhere else in CI the
+      # probe rules read fixtures we wrote; here `lscpu` and the THP sysfs node
+      # genuinely exist, so this is the only job that can produce a bundle whose
+      # manifest says "synthetic": false from observations nobody authored.
+      # It proves the path a stranger uses on their own machine actually works
+      # end to end, on the target ISA, at zero extra build cost.
+      - name: Record a bundle from this Arm host, then diagnose with it
+        run: |
+          .venv/bin/armsmith record . \
+            --out ./arm-bundle \
+            --scenario "github-arm64-runner" \
+            --python .venv/bin/python \
+            --no-copy-repo \
+            --note "captured on a GitHub-hosted ubuntu-24.04-arm runner"
+          echo "--- manifest ---"
+          cat ./arm-bundle/manifest.json
+          # Fail loudly if the bundle came back empty or mislabelled: a green
+          # tick on a bundle that captured nothing would prove the opposite of
+          # what this step exists to show.
+          .venv/bin/python - <<'PY'
+          import json, sys
+          m = json.load(open("arm-bundle/manifest.json"))
+          assert m["synthetic"] is False, m
+          got = set(m["captured_probes"])
+          missing = {"lscpu"} - got
+          assert not missing, f"expected lscpu on an Arm runner, captured {sorted(got)}"
+          print("captured:", sorted(got), "| rules enabled:", m["rules_enabled"])
+          PY
+          .venv/bin/armsmith diagnose --replay ./arm-bundle \
+            --out report-recorded.json --pr-dry-run
+          .venv/bin/armsmith verify report-recorded.json
       - name: Publish the evidence to the run summary
         if: always()
         run: |
@@ -163,6 +194,7 @@ jobs:
           path: |
             report-live.json
             live-evidence.md
+            report-recorded.json
 
   # ── STAGE 6: Deploy gate ──────────────────────────────────────────────
   # One required check that means "everything passed", so branch protection
@@ -181,7 +213,7 @@ jobs:
             echo ""
             echo "| stage | what it proved |"
             echo "|---|---|"
-            echo "| 1 · Quality | ruff + mypy + 414 tests at 100% line coverage, on 6 legs (4 native arm64) |"
+            echo "| 1 · Quality | ruff + mypy + 429 tests at 100% line coverage, on 6 legs (4 native arm64) |"
             echo "| 2 · Security | TruffleHog verified-secret scan over full git history · pip-audit |"
             echo "| 3 · Build | wheel installs clean and still finds its rule packs + schema |"
             echo "| 4 · E2E | offline scan → gate → sign → verify, plus the \`armsmith ci\` twin |"

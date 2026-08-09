@@ -46,6 +46,29 @@ def version() -> None:
     console.print(f"armsmith {__version__}")
 
 
+def _version_callback(value: bool) -> None:
+    if value:
+        console.print(f"armsmith {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def _main(
+    version: bool = typer.Option(
+        None, "--version", "-V",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the version and exit.",
+    ),
+) -> None:
+    """Profile → diagnose → patch → prove → PR, for AI repos on Arm.
+
+    `--version` exists as well as the `version` subcommand because `--version`
+    is what people actually type first, and erroring out on it is a poor way to
+    say hello.
+    """
+
+
 # ---------------------------------------------------------------------------
 # diagnose
 # ---------------------------------------------------------------------------
@@ -54,8 +77,9 @@ def version() -> None:
 def diagnose(
     replay: Path = typer.Option(
         ..., "--replay", exists=True, file_okay=False,
-        help="Replay bundle directory (recorded probes + bench records). "
-             "Live hardware mode is TODO(S1).",
+        help="Bundle directory of recorded probes + bench records. Make one for "
+             "your own machine with `armsmith record`; the fixtures under "
+             "fixtures/replays/ are synthetic and labelled as such.",
     ),
     out: Path = typer.Option(Path("report.json"), "--out", "-o", help="Report output path."),
     sign: bool = typer.Option(True, "--sign/--no-sign", help="ed25519-sign the report."),
@@ -75,9 +99,20 @@ def diagnose(
         raise typer.Exit(code=2)
 
     rpt = result.report
-    console.print(
-        "[yellow]⚠ REPLAY MODE — synthetic/recorded data; not hardware results.[/yellow]"
-    )
+    # The banner reports PROVENANCE, not transport. A bundle written by
+    # `armsmith record` is replayed but entirely real, and stamping it
+    # "synthetic" understates a genuine measurement exactly as badly as the
+    # reverse would overstate one — which is the one mistake this tool cannot
+    # afford to make about its own output.
+    if rpt.get("synthetic", True):
+        console.print(
+            "[yellow]⚠ REPLAY MODE — synthetic fixture data; not hardware results.[/yellow]"
+        )
+    else:
+        console.print(
+            "[green]● RECORDED — real observations captured on a host "
+            "([bold]\"synthetic\": false[/bold]); replayed, not fabricated.[/green]"
+        )
 
     # findings table
     table = Table(title=f"Rule scan — {rpt['scenario']}")
@@ -737,11 +772,18 @@ def doctor(
     )
     from .probes import ReplayProbe
 
-    if not offline:
+    # One failure, with the whole invocation. Previously this errored on the
+    # missing --offline, and then errored AGAIN on the missing source, so a
+    # newcomer had to fail twice to learn one command.
+    if not offline or (replay is None and lscpu_file is None):
         err_console.print(
-            "doctor requires --offline in the Phase-1 core: live capture (lscpu/"
-            "sysreport on the target box) is TODO(S1), and armsmith never "
-            "fingerprints this development machine as if it were a target."
+            "doctor needs --offline AND a recorded source to fingerprint.\n\n"
+            "  armsmith doctor --offline --replay fixtures/replays/scenario_ragserve\n"
+            "  armsmith doctor --offline --lscpu-file <recorded-lscpu.txt>\n\n"
+            "Record a bundle for your own machine first with:\n"
+            "  armsmith record . --out ./bundle\n\n"
+            "Live capture straight off this host is deliberately absent: armsmith "
+            "never fingerprints the development machine as if it were the target."
         )
         raise typer.Exit(code=2)
 
@@ -752,7 +794,8 @@ def doctor(
             err_console.print(f"bundle {replay} records no lscpu probe")
             raise typer.Exit(code=2)
         fp = capture_fingerprint(probe, probe.manifest.host)
-    elif lscpu_file is not None:
+    else:
+        assert lscpu_file is not None  # guaranteed by the guard above
         kv = parse_lscpu(lscpu_file.read_text(encoding="utf-8"))
         flags = kv.get("Flags", "").split()
         fp = HostFingerprint(
@@ -764,9 +807,8 @@ def doctor(
             flags=tuple(flags),
             source=f"fixture:{lscpu_file.name}",
         )
-    else:
-        err_console.print("provide --replay <bundle> or --lscpu-file <recorded lscpu output>")
-        raise typer.Exit(code=2)
+    # No third branch: the guard at the top of this command already rejected
+    # the case where neither source was supplied, with the full invocation.
 
     console.print(f"[yellow]⚠ fingerprint source: {fp.source} — recorded data, not this machine[/yellow]")
     info = Table(title="Host fingerprint")

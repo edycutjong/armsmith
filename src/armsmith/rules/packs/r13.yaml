@@ -5,7 +5,7 @@ kind: probe
 requires: [llama_bench, hyperfine]
 summary: >
   llama-bench timings exclude tokenization and sampling (verified caveat in
-  crawl/clean/sdk_llamacpp.md), so Armsmith runs BOTH instruments on the
+  the llama.cpp build docs), so Armsmith runs BOTH instruments on the
   same workload: llama-bench for kernel-time tokens/sec and hyperfine for
   end-to-end wall time. When end-to-end exceeds kernel time by more than
   15%, the pipeline — not the kernels — is the bottleneck, and kernel

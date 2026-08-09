@@ -9,7 +9,7 @@ bundle manifest host block).  There is no code path that fabricates a
 Graviton fingerprint from this development machine.  TODO(S1): live capture
 via lscpu/uname/sysreport on the target box (sysreport is a Python CLI with
 no formal API — `doctor` will shell out and parse the text summary, per
-crawl/clean/sdk_sysreport.md).
+the Arm sysreport documentation).
 """
 
 from __future__ import annotations

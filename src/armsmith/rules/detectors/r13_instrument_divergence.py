@@ -2,7 +2,7 @@
 
 Two-instrument triangulation (squeeze pass 2 #1): llama-bench measures
 kernel-time tokens/sec and EXCLUDES tokenization + sampling (verified caveat,
-crawl/clean/sdk_llamacpp.md); hyperfine measures end-to-end wall time of the
+the llama.cpp build docs); hyperfine measures end-to-end wall time of the
 same workload.  If E2E exceeds reconstructed kernel time by > 15%, the
 pipeline — not the kernels — is the bottleneck.
 

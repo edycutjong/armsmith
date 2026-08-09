@@ -7,10 +7,18 @@
 #
 #   - uses: edycutjong/armsmith@v1
 #     with:
-#       replay: fixtures/replays/scenario_ragserve
+#       replay: ./armsmith-bundle
+#
+# `replay:` points at a bundle in YOUR repo — the path above is an example, not
+# something this action ships. Create one first, on the machine you want gated:
+#
+#   armsmith record . --out ./armsmith-bundle
+#
+# (`fixtures/replays/scenario_ragserve` appears in Armsmith's own docs; it only
+# exists inside this repo and is synthetic, so do not point a real gate at it.)
 #
 # Live-target mode (armsmith diagnose <repo> --target ssh://…) is TODO(S1);
-# this action gates on a recorded/replay bundle today and never fabricates a
+# this action gates on a recorded bundle today and never fabricates a
 # hardware measurement. The formal Marketplace listing is publish-pending.
 name: "Armsmith Arm performance gate"
 description: "Fail CI on an Arm performance regression, proven by the reproduce gate (median-of-N · MAD noise band · output-hash equality)."
@@ -19,7 +27,7 @@ branding:
   color: "orange"
 inputs:
   replay:
-    description: "Path to the replay bundle to gate (recorded probes + bench records)."
+    description: "Path to the bundle to gate, in your own repo. Create it with `armsmith record . --out ./armsmith-bundle`."
     required: true
   python-version:
     description: "Python version to install armsmith under."

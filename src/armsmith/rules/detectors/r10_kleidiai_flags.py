@@ -1,6 +1,6 @@
 """R10 — llama.cpp/ggml built without KleidiAI (probe: cmake_cache).
 
-Flag surface verified in crawl/clean/sdk_llamacpp.md:
+Flag surface verified against the llama.cpp build docs:
 ``-DGGML_CPU_KLEIDIAI=ON`` build flag + ``GGML_KLEIDIAI_SME`` env
 (unset=auto / 0=disable / >0=force) + macOS ``--device none`` caveat.
 """

@@ -7,7 +7,7 @@ summary: >
   The CMake cache of a ggml/llama.cpp build shows GGML_CPU_KLEIDIAI absent
   or OFF. KleidiAI microkernels use dotprod/i8mm/SVE/SME and are selected
   at runtime per detected CPU capability — leaving the flag off forfeits
-  them (flag surface verified in crawl/clean/sdk_llamacpp.md).
+  them (flag surface verified against the llama.cpp build docs).
 fix_generator: >
   Rebuild with -DGGML_CPU_KLEIDIAI=ON (A/B both builds through the gate);
   on SME-capable hosts additionally sweep the GGML_KLEIDIAI_SME env var

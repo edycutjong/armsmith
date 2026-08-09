@@ -165,3 +165,197 @@ def test_r12_clean_when_no_workflows(tmp_path, specs):
     repo.mkdir()
     f = run_rule(specs["R12"], repo, ReplayProbe(tmp_path))
     assert f.status is FindingStatus.CLEAN
+
+
+def test_r4_never_suggests_a_patch_it_cannot_prove(tmp_path, specs):
+    """The regression the rule exists to avoid: corrupting an index array.
+
+    A dtype-less call on a non-literal payload is still REPORTED — under-
+    reporting a real float64 coercion on an inference path costs more than a
+    question. But it must not carry a "pin float32" patch, because if the
+    payload holds integers that edit silently breaks the indexing. This is the
+    exact shape found in huggingface/text-generation-inference.
+    """
+    repo, probe = _inline_repo(tmp_path, "r4-unprovable", (
+        "import numpy as np\n"
+        "def f(adapter_indices):\n"
+        "    a = np.array(adapter_indices)\n"
+        "    return a\n"
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+
+    assert f.status is FindingStatus.MATCHED
+    assert f.fix.kind == "advisory"
+    assert "dtype=np.float32" not in f.fix.patch
+    assert "CORRUPTS" in f.fix.patch
+    assert "not statically provable" in f.evidence[0]
+
+
+def test_r4_still_patches_what_it_can_prove(tmp_path, specs):
+    repo, probe = _inline_repo(tmp_path, "r4-proven", "import numpy as np\nb = np.zeros(8)\n")
+    f = run_rule(specs["R4"], repo, probe)
+
+    assert f.fix.kind == "code_suggestion"
+    assert "add dtype=np.float32" in f.fix.patch
+    assert "this call returns float64" in f.evidence[0]
+
+
+def test_r4_separates_proven_from_unprovable_in_one_report(tmp_path, specs):
+    repo, probe = _inline_repo(tmp_path, "r4-mixed", (
+        "import numpy as np\n"
+        "def f(payload):\n"
+        "    a = np.zeros(4)\n"          # 3 proven
+        "    b = np.array(payload)\n"    # 4 unprovable
+        "    return a, b\n"
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+
+    assert len(f.locations) == 2
+    assert f.fix.kind == "code_suggestion"
+    assert "safe to pin" in f.fix.patch and "NOT auto-patchable" in f.fix.patch
+    assert "1 site(s) are reported for review only" in f.fix.description
+
+
+def test_r4_ignores_integer_comprehensions(tmp_path, specs):
+    """Found on vllm: np.array([i for i in range(n) ...]) is int64, not float64."""
+    repo, probe = _inline_repo(tmp_path, "r4-comprehension", (
+        "import numpy as np\n"
+        "idx = np.array([i for i in range(vocab_size)])\n"
+        "pairs = np.array([2 for _ in range(4)])\n"
+        "vals = np.array([x for x in floats])\n"   # not a range -> unprovable, reported
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+
+    flagged = sorted(int(loc.rsplit(":", 1)[1]) for loc in f.locations)
+    assert flagged == [4]
+
+
+def test_r4_treats_an_argless_constructor_as_unprovable(tmp_path, specs):
+    """np.array() has no payload to reason about, so it must not be patched."""
+    repo, probe = _inline_repo(tmp_path, "r4-argless", "import numpy as np\nx = np.array()\n")
+    f = run_rule(specs["R4"], repo, probe)
+    assert f.status is FindingStatus.MATCHED
+    assert f.fix.kind == "advisory"
+
+
+# --- R12 matrix resolution ---------------------------------------------------
+
+def _wf_repo(tmp_path, name, workflow_yaml):
+    import json
+    (tmp_path / "manifest.json").write_text(json.dumps(
+        {"synthetic": True, "provenance": "inline test fixture", "scenario": name}))
+    repo = tmp_path / "repo"
+    (repo / ".github" / "workflows").mkdir(parents=True)
+    (repo / ".github" / "workflows" / "docker.yml").write_text(workflow_yaml)
+    return repo, ReplayProbe(tmp_path)
+
+
+def test_r12_resolves_a_matrix_expression_that_includes_arm64(tmp_path, specs):
+    """Regression: llama.cpp declares platforms via matrix and DOES ship arm64."""
+    repo, probe = _wf_repo(tmp_path, "r12-matrix-arm", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - { tag: cpu, platforms: "linux/amd64" }
+          - { tag: cpu, platforms: "linux/arm64" }
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.config.platforms }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+
+
+def test_r12_still_fires_when_the_resolved_matrix_has_no_arm64(tmp_path, specs):
+    repo, probe = _wf_repo(tmp_path, "r12-matrix-noarm", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config:
+          - { tag: cpu, platforms: "linux/amd64" }
+          - { tag: gpu, platforms: "linux/386" }
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.config.platforms }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.MATCHED
+
+
+def test_r12_stays_silent_on_an_unresolvable_matrix_expression(tmp_path, specs):
+    """The matrix is built at runtime (llama.cpp uses fromJSON of a generated file).
+
+    We cannot see the values, so guessing 'no arm64' would be a false positive.
+    """
+    repo, probe = _wf_repo(tmp_path, "r12-matrix-runtime", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        config: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.config.platforms }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+    assert any("could not be resolved statically" in e for e in f.evidence)
+    assert f.locations == ()
+
+
+def test_r12_resolves_a_plain_matrix_key_and_include_entries(tmp_path, specs):
+    repo, probe = _wf_repo(tmp_path, "r12-matrix-include", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ["linux/amd64"]
+        include:
+          - platform: "linux/arm64"
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+
+
+def test_r12_matrix_expression_without_a_strategy_block_is_not_reported(tmp_path, specs):
+    repo, probe = _wf_repo(tmp_path, "r12-no-strategy", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+    assert f.locations == ()
+
+
+def test_r12_platforms_helper_refuses_to_resolve_without_a_job():
+    """Contract: no job context means no resolution, never a guess."""
+    from armsmith.rules.detectors.r12_ci_matrix import _platforms_of
+
+    step = {"with": {"platforms": "${{ matrix.config.platforms }}"}}
+    assert _platforms_of(step) == ("${{ matrix.config.platforms }}", None)
+    literal = {"with": {"platforms": "linux/amd64,linux/arm64"}}
+    assert _platforms_of(literal)[1] == "linux/amd64,linux/arm64"

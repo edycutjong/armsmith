@@ -277,3 +277,45 @@ def test_result_separates_captured_from_missing_kinds(tmp_path, repo, monkeypatc
 def test_capture_result_exposes_the_rules_it_unlocks():
     assert rec.CaptureResult("build_log", True, "x").rules == ("R2",)
     assert rec.CaptureResult("lscpu", True, "x").rules == ()
+
+
+# --- provenance must survive into every surface ------------------------------
+
+def test_recorded_bundle_is_not_labelled_synthetic_anywhere(tmp_path, repo, monkeypatch):
+    """The mirror-image overclaim: stamping REAL data as synthetic.
+
+    A bundle from `armsmith record` is replayed but genuine. The CLI banner and
+    the PR body both used to key off transport (`mode == "replay"`) and called
+    it synthetic, which understates a real measurement as badly as the reverse
+    would overstate one.
+    """
+    from armsmith.diagnose import run_replay_diagnosis
+    from armsmith.evidence import render_markdown
+
+    _no_numpy(monkeypatch)
+    _fake_live(monkeypatch, {"lscpu": "Model name: Neoverse-N2\n"})
+    out = tmp_path / "b"
+    rec.record_bundle(repo, out, scenario="live-capture")
+
+    report = run_replay_diagnosis(out, sign=False).report
+    assert report["synthetic"] is False
+    assert report["mode"] == "replay"
+
+    body = render_markdown(report)
+    assert "SYNTHETIC DATA" not in body
+    assert "RECORDED — REAL OBSERVATIONS" in body
+    assert '"synthetic": false' in body
+
+
+def test_synthetic_fixture_is_still_labelled_synthetic(tmp_path):
+    """The guard must not swing the other way."""
+    import json
+
+    from tests.conftest import FIXTURES
+
+    from armsmith.evidence import render_markdown
+
+    report = json.loads((FIXTURES / "replays" / "scenario_ragserve" / "report.json").read_text())
+    assert report["synthetic"] is True
+    body = render_markdown(report)
+    assert "SYNTHETIC DATA" in body

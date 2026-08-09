@@ -202,10 +202,33 @@ def test_ci_replay_passes_without_regression(tmp_path):
     assert "0 regression(s)" in flat
 
 
-def test_doctor_requires_offline():
+def test_doctor_fails_once_with_the_whole_invocation():
+    """It used to error on --offline, then error again on the missing source.
+
+    Two failures to learn one command is a bad first minute. One failure now
+    prints the complete working invocation.
+    """
     res = runner.invoke(app, ["doctor"])
     assert res.exit_code == 2
-    assert "TODO(S1)" in res.output
+    flat = " ".join(res.output.split())
+    assert "armsmith doctor --offline --replay" in flat
+    assert "--lscpu-file" in flat
+    assert "armsmith record" in flat          # how to make a source of your own
+
+    # --offline alone is still incomplete, and must fail the SAME way.
+    res2 = runner.invoke(app, ["doctor", "--offline"])
+    assert res2.exit_code == 2
+    assert "armsmith doctor --offline --replay" in " ".join(res2.output.split())
+
+
+def test_version_flag_and_subcommand_agree():
+    """`--version` is what people type first; erroring on it is a poor hello."""
+    from armsmith import __version__
+
+    for argv in (["--version"], ["-V"], ["version"]):
+        res = runner.invoke(app, argv)
+        assert res.exit_code == 0, argv
+        assert f"armsmith {__version__}" in res.output
 
 
 def test_doctor_offline_replay_bundle():
@@ -311,3 +334,33 @@ def test_rules_export_cards_contain_a_real_before_after_diff(tmp_path):
     # rather than an invented one.
     assert "## Before → after" not in (out / "R13.md").read_text()
     assert "```" not in (out / "R13.md").read_text()
+
+
+def test_diagnose_banner_reports_provenance_not_transport(tmp_path, monkeypatch):
+    """A recorded bundle is replayed but REAL — the banner must say so.
+
+    Keying the banner off `mode == "replay"` labelled genuine host observations
+    as synthetic, which understates a real measurement exactly as badly as the
+    reverse would overstate one.
+    """
+    from armsmith import record as rec
+
+    monkeypatch.setattr(rec, "_capture_numpy_show_config",
+                        lambda python=None: ("name: openblas64\n", "py -c ..."))
+    src = tmp_path / "svc"
+    src.mkdir()
+    (src / "app.py").write_text("import numpy as np\nx = np.zeros(4)\n")
+    bundle = tmp_path / "bundle"
+    rec.record_bundle(src, bundle, scenario="live-capture")
+
+    res = runner.invoke(app, ["diagnose", "--replay", str(bundle),
+                              "--no-sign", "--out", str(tmp_path / "r.json")])
+    assert res.exit_code == 0, res.output
+    assert "RECORDED" in res.output
+    assert "REPLAY MODE" not in res.output
+
+    # and the synthetic fixture must still be called synthetic
+    res2 = runner.invoke(app, ["diagnose", "--replay", SCENARIO,
+                               "--no-sign", "--out", str(tmp_path / "r2.json")])
+    assert "REPLAY MODE" in res2.output
+    assert "synthetic fixture data" in res2.output
