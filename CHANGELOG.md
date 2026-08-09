@@ -1,6 +1,68 @@
 # CHANGELOG
 
 
+## v1.3.2 (2026-08-09)
+
+### Bug Fixes
+
+- **ci**: Make the arm64 record leg actually diagnose, and stop overstating what a bundle can answer
+  ([`e6ffdee`](https://github.com/edycutjong/armsmith/commit/e6ffdeeddd48bfd8bea2601866e922179882d68f))
+
+The record -> diagnose leg proved the path ran, but the bundle it produced enabled zero rules and
+  all thirteen skipped. "0 rules enabled, 13 skipped" is a green tick on a step that demonstrated
+  nothing, which is precisely the shape of evidence this project refuses everywhere else.
+
+The runner now produces REAL instrument artifacts and hands them to record:
+
+pip-install.log (tee of a real `pip install -v numpy`) -> R8 a numpy venv (--python points at it) ->
+  R3 build.log (real gcc -v on the bench kernel) -> R2 lscpu / THP (captured by record itself)
+
+and the repo copy is enabled again so the static rules run too. The assertion is now the thing that
+  matters: the bundle must be synthetic:false, it must enable at least one probe rule, and at least
+  four rules must actually RUN rather than skip. A bundle that captured nothing can no longer pass.
+
+Separately, rules_enabled was itself overstating. It used a hand-maintained probe->rule map that
+  credited a rule as soon as ONE of its probes arrived, so a bundle with only build_log claimed R2
+  was answerable when R2 also needs lscpu. It now reads each rule's own `requires` from the pack, so
+  the claim cannot drift from the rules it describes. A test asserted the old behaviour; that test
+  was encoding the overstatement and has been corrected, plus a new one pins that a multi-probe rule
+  appears only when every probe is present.
+
+456 tests, 100% coverage.
+
+- **record**: Don't recurse when the bundle lives inside the repo
+  ([`43479ad`](https://github.com/edycutjong/armsmith/commit/43479ad79f6c82107b8203dd6a28fc4388f76004))
+
+RecursionError on CI, and it affects the DOCUMENTED command: the README tells you to run `armsmith
+  record . --out ./armsmith-bundle`, which puts the bundle inside the tree being copied, so
+  shutil.copytree descended into the directory it was writing until the interpreter gave up.
+
+It only stayed hidden because every earlier test used --no-copy-repo or an output path in /tmp. The
+  ignore callback now excludes the bundle root and anything under it, and a regression test records
+  into a directory inside the repo and asserts the bundle did not copy itself.
+
+457 tests, 100% coverage.
+
+### Documentation
+
+- Api reference, and a PR body that leads with what works today
+  ([`c9fadba`](https://github.com/edycutjong/armsmith/commit/c9fadbaf0a19c46ad35f5a3534fa26a96da1f455))
+
+Two of the last three fixable deductions.
+
+docs/API.md documents the six importable modules that the README has been advertising as reusable
+  without ever showing a signature: benchstats (the median-of-N / scaled-MAD refuse-to-claim rule,
+  the part most worth stealing), gate, report, witness, rules, and benchcmd. Every claim in it was
+  executed before committing - compare() really returns -40.0%, plan_interleaved really emits w:a
+  w:b m:a m:b m:a m:b, count_witness really finds the smmla, load_pack really returns 13. A docs
+  file that lies would be worse than none on this project in particular.
+
+The PR body no longer ships 'TODO(S1) wiring' to end users as its closing note. It now leads with
+  the verification that actually works today - armsmith verify re-derives every statistic from the
+  embedded samples, offline - and demotes the unwired cosign invocation to a clearly-labelled
+  reference line.
+
+
 ## v1.3.1 (2026-08-09)
 
 ### Bug Fixes
