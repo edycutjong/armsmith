@@ -1,6 +1,69 @@
 # CHANGELOG
 
 
+## v1.0.2 (2026-08-09)
+
+### Bug Fixes
+
+- **schema**: Serve report.schema.json at the $id it declares
+  ([`919ca52`](https://github.com/edycutjong/armsmith/commit/919ca52903428c7ba9eded331de0752b7c9476d1))
+
+The repo-root schema/ path is a symlink to the packaged copy, which git stores as a symlink blob —
+  so github.com and raw.githubusercontent both 404 on schema/report.schema.json even though the file
+  is right there. Anyone told to 'build your own viewer against it' hit a dead link.
+
+- README links now point at src/armsmith/schema/report.schema.json, which resolves for a browser and
+  for curl. - site/schema/report.schema.json makes the declared $id
+  (https://armsmith.edycu.dev/schema/report.schema.json) actually serve. A copy, not a symlink:
+  Vercel will not follow one. - CI diffs the served copy against the packaged original, so the
+  published schema can never drift from the one that validates reports.
+
+The symlink stays — ci.yml reads through it.
+
+### Documentation
+
+- Link the badge at the live Devpost submission
+  ([`779a195`](https://github.com/edycutjong/armsmith/commit/779a195e0601495c7dd50fe091c69ffb36c9b627))
+
+Submitted to the Arm AI Optimization Challenge (Cloud AI) as
+  https://devpost.com/software/armsmith-7j1lzt — verified live, and the page carries the repo,
+  armsmith.edycu.dev and the demo video.
+
+The Devpost badge now points at the submission itself rather than the hackathon landing page; the
+  hackathon keeps its own badge beside it, relabelled to name the track. 'docs:' deliberately, so
+  semantic-release does not cut a version for a badge.
+
+- **contributing**: Fix the org in action.yml, document the detector contract
+  ([`d7fc655`](https://github.com/edycutjong/armsmith/commit/d7fc655c55854e71032eb90f52889918d3a6db0a))
+
+Three things a stranger hit immediately:
+
+- action.yml's own usage comment said 'uses: edycu/armsmith@v1'. That org does not exist;
+  copy-pasting it gets 'Unable to resolve action'. The README had it right, the file itself did not.
+  - CONTRIBUTING told new contributors to expect 219 tests. It is 384, so the first checkpoint on
+  the on-ramp failed. - 'Add a 14th rule with zero core changes' was not true: the detector also
+  needs an import in detectors/__init__.py or the @register decorator never runs and the loader
+  raises 'rules without detectors'. Now documented as one YAML + one detector + one import, with the
+  real detect() signature spelled out — it was previously undocumented anywhere.
+
+- **site**: Publish the measured Neoverse-N2 result, retire [PENDING]
+  ([`97c356d`](https://github.com/edycutjong/armsmith/commit/97c356dea75e36ce331cecd3055a2de57a876ae7))
+
+The site and deck were written before the live Arm leg existed and still said the hardware number
+  was [PENDING] in seven places, while the README led with SDOT 0->1 and -86.5%. The two
+  most-visited surfaces contradicted the headline and read as 'they never got real silicon'.
+
+- Hero stat tile + figcaption now carry -86.5% / SDOT 0->1 on Neoverse-N2. - FAQ Q2 answers 'yes,
+  one leg is real hardware' with the full table (0.059975s -> 0.008123s, band +/-0.000144s, gate
+  keep) instead of [PENDING]. - Deck slide 09 moves the measurement into the 'real today' column and
+  updates the CI matrix (8 jobs, 5 native arm64 — it claimed 6 and 2). - Stale counts corrected
+  everywhere: 219 -> 384 tests, ~93% -> 100% coverage.
+
+What stays unclaimed is stated more precisely than before: a throughput multiplier for YOUR model.
+  The measured number is one int8 microkernel on one runner and is never extrapolated. The replay
+  witness stays 0->4 — that is the synthetic fixture and is a different number from the live 0->1.
+
+
 ## v1.0.1 (2026-08-09)
 
 ### Bug Fixes
