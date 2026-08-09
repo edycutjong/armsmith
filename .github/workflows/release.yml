@@ -40,6 +40,11 @@ jobs:
     concurrency:
       group: release
       cancel-in-progress: false   # never abort a half-published release
+    outputs:
+      # Whether semantic-release actually cut a version this run. Downstream
+      # publishing must gate on this: the release workflow fires after EVERY
+      # successful ci run, and most pushes (docs, chore, ci) cut nothing.
+      released: ${{ steps.semrel.outputs.released }}
 
     steps:
       - uses: actions/checkout@v7
@@ -91,7 +96,10 @@ jobs:
   publish-pypi:
     name: "Publish to PyPI"
     needs: [release]
-    if: vars.PUBLISH_TO_PYPI == 'true'
+    # Only when a version was actually cut. Without the released check this ran
+    # on every push — three publish attempts and three deployment records in
+    # 25 minutes, each a no-op saved only by skip-existing.
+    if: vars.PUBLISH_TO_PYPI == 'true' && needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
     # The url makes the Deployments entry link straight to the published
     # package instead of being a bare "pypi" label with nowhere to go.
