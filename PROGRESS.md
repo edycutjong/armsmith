@@ -2,7 +2,8 @@
 
 Session: 2026-07-04, extended 2026-08-08 · build target `build/` · specs FROZEN
 (deviations → DEVIATIONS.md).
-Suite: **234 pytest tests, 234 passing, 0 failing** (`.venv/bin/python -m pytest`) plus
+Suite: **410 pytest tests, 410 passing, 0 failing, 100% line coverage**
+(`.venv/bin/python -m pytest`) plus
 `scripts/verify_offline.py` end-to-end green. Every measurement-shaped value is either a labeled
 synthetic replay fixture (`synthetic: true`) or a real live measurement (`mode: "live"`,
 `synthetic: false`) — nothing is unlabeled, and nothing is fabricated.
@@ -86,7 +87,10 @@ targets and the remaining instruments stay TODO(S1).
 
 ## Test count vs COMPLEXITY target
 
-**234 green now** vs blueprint target **150** (which included hardware-phase tests). 208 of them are
+**410 green now** vs blueprint target **150** (which included hardware-phase tests), at 100% line
+coverage. The 2026-08-09 additions cover `armsmith record` (the honesty contract: manifest declares
+`synthetic: false`, refused probes are never written, unobservable probes are omitted rather than
+guessed) and R4's dtype-inference guard. Of the earlier 234, 208 are
 hardware-free (rule pack 49 · benchstats 39 · gate/report/keys 37 · probes/fingerprint/gguf 26 ·
 CLI/e2e 24 · evidence/witness/ghpr 22 · planner 11); the 2026-08-08 additions cover the live Arm
 leg (livebench honesty invariants + workload-contract parsing + LiveProbe refusals), one of which
@@ -102,9 +106,11 @@ handshake — the categories COMPLEXITY counted toward its 25 replay-integration
 3. Arm MCP Server handshake; enumerate tool names; wire `query_arm_mcp` + R1/R12 validator
    cross-check (Tier A #2).
 4. arm64 runner smoke on a scratch public repo (labels already wired in ci.yml).
-5. ~~LiveProbe~~ **done for local exec** (lscpu/THP/captured disassembly, 2026-08-08); still owed:
-   `ssh://` targets and `scripts/record_replays.sh` so live runs write the bundle layout
-   ReplayProbe reads.
+5. ~~LiveProbe~~ **done for local exec** (lscpu/THP/captured disassembly, 2026-08-08), and
+   ~~bundle recording~~ **done 2026-08-09**: `armsmith record` writes the bundle layout
+   ReplayProbe reads, with `"synthetic": false`, so probe rules run on a stranger's repo rather
+   than only on our fixtures. Still owed: `ssh://` targets, to record a bundle for a remote Arm
+   box from a laptop.
 6. ClaudePlanner tool-use loop (contract pinned in planner/interface.py; model per spec).
 7. `armsmith pr` real posting (PyGithub), cosign keyless in CI, sysreport in `doctor`.
 
