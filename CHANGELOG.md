@@ -1,6 +1,53 @@
 # CHANGELOG
 
 
+## v1.3.1 (2026-08-09)
+
+### Bug Fixes
+
+- Two verified false results, a broken wheel path, and the front-page numbers
+  ([`2ffd1bd`](https://github.com/edycutjong/armsmith/commit/2ffd1bd683c30177bbd16be4a75b851fa331fe84))
+
+Found by pointing the tool at real repos again, and by a cold install.
+
+R4 was blind to dtype casts. np.array(1.0).astype(np.float32) pins the dtype one call later, so the
+  constructor's default never survives - reporting it is a false positive on correct code, and it
+  fires on onnx's backend test models. The visitor now marks a constructor whose result is
+  immediately .astype()/.view()'d and skips it. NodeVisitor reaches the outer call first, so the
+  inner one is already marked by the time it is visited.
+
+R12 could not resolve the commonest matrix form. The docstring claimed it handled a plain key
+  (matrix.platform), but walk() only appended when the node was a scalar AND no keys remained, so a
+  terminal list yielded nothing - an amd64-only plain-key matrix silently reported CLEAN. That is a
+  false NEGATIVE, the worse kind of miss, and the docstring was describing a capability the code did
+  not have.
+
+bench-live was unusable from a pip install. The kernel sources lived at the repo root, outside the
+  package, so they never reached a wheel - and the PyPI README told people to run the command
+  anyway. Same failure mode as the report schema had, and the same fix: the .c files now live in
+  src/armsmith/bench/ and ship as package data. Verified by installing the wheel into a clean venv
+  and running bench-live from /tmp.
+
+Front-page numbers were wrong. A bad shell substitution in an earlier commit had left "Tests | 1
+  passing" in the rigor table, and "CI jobs per push | 8" when there are 10. On a project whose
+  entire thesis is numeric honesty, those are the most expensive kind of typo.
+
+The tagline claimed something the code contradicts. "The LLM plans; the silicon decides" sat above a
+  ClaudePlanner that raises NotImplementedError. It now reads "The planner proposes; the silicon
+  decides", with one line saying the shipped planner is a deterministic sort and the Claude loop is
+  contract-pinned and not wired. Nothing about the thesis depended on the planner being an LLM - the
+  gate is what makes a result trustworthy - so the honest phrasing costs nothing.
+
+Also: - scan --json emits EVERY match with full evidence, fix and citations. A table is for a human;
+  JSON is for a pipeline, and truncating to one exemplar there would make a scan look cleaner than
+  the repo is. - record now says at the point of pain that a Mac produces an empty bundle by design,
+  and the README Prerequisites say which commands work on Darwin. - The site and deck now show the
+  SECOND measured instruction (SMMLA 0 -> 1, -71.9% under +i8mm) beside the first, and carry the
+  drift note the README already made. That engineering existed only in CI and was scoring zero.
+
+455 tests, 100% coverage.
+
+
 ## v1.3.0 (2026-08-09)
 
 ### Continuous Integration
