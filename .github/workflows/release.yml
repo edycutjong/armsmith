@@ -93,7 +93,11 @@ jobs:
     needs: [release]
     if: vars.PUBLISH_TO_PYPI == 'true'
     runs-on: ubuntu-latest
-    environment: pypi
+    # The url makes the Deployments entry link straight to the published
+    # package instead of being a bare "pypi" label with nowhere to go.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/armsmith/
     permissions:
       id-token: write        # required for Trusted Publishing
     steps:
