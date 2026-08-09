@@ -976,8 +976,12 @@ html.js .reveal.d3{transition-delay:.24s}
           <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
           <span class="t">judge quickstart — zero hardware (~2 min)</span>
         </div>
-<pre id="qsCode"><span class="cmd">git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith</span>
-<span class="cmd">python -m venv .venv &amp;&amp; source .venv/bin/activate</span>
+<pre id="qsCode"><span class="c"># scan any repo with no install at all — armsmith is on PyPI</span>
+<span class="cmd">uvx armsmith scan .</span>
+
+<span class="c"># or clone, to reproduce the full gate against the replay bundles</span>
+<span class="cmd">git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith</span>
+<span class="cmd">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="cmd">pip install -e '.[dev]'</span>
 
 <span class="cmd">python -m pytest -q</span>                                             <span class="c"># 386 passing, fully offline</span>

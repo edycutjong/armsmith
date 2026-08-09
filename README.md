@@ -24,6 +24,7 @@
 
   [![CI](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/edycutjong/armsmith?sort=semver&logo=semanticrelease&logoColor=white&color=2EE6A6)](https://github.com/edycutjong/armsmith/releases)
+  [![PyPI](https://img.shields.io/pypi/v/armsmith?logo=pypi&logoColor=white&color=3775A9)](https://pypi.org/project/armsmith/)
   ![386 tests passing](https://img.shields.io/badge/tests-386%20passing-brightgreen)
   ![coverage 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)
   ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat&logo=python&logoColor=white)
@@ -52,6 +53,15 @@ as wins, and dropped fixes are reported, never hidden.
 
 *(PR rendering is dry-run today: it prints exactly what would ship and makes no network call.
 Posting is [on the roadmap](#-roadmap) and marked in code rather than implied here.)*
+
+Scan any repo for aarch64 anti-patterns without installing anything:
+
+```bash
+uvx armsmith scan .          # or: pipx run armsmith scan .   ·   pip install armsmith
+```
+
+To reproduce the full gate — baseline, 13-rule scan, keep/drop verdicts, signed report — clone and
+run the replay bundle:
 
 ```bash
 git clone https://github.com/edycutjong/armsmith && cd armsmith
@@ -342,9 +352,20 @@ so the numbers above are re-derivable by anyone with the repo and an Arm runner 
 
 ### Installation
 
+**To use it** — [`armsmith` on PyPI](https://pypi.org/project/armsmith/), no clone:
+
+```bash
+uvx armsmith scan .        # zero-install, one command
+pipx install armsmith      # or keep it on your PATH
+pip install armsmith       # or into a venv you manage
+```
+
+**To reproduce the gate or hack on it** — the replay bundles and the test suite live in the repo,
+so this path needs the clone:
+
 ```bash
 git clone https://github.com/edycutjong/armsmith && cd armsmith
-python -m venv .venv && source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
 ```
 
@@ -450,6 +471,10 @@ DX clause and the rubric's reusable-artifacts Impact:
   noise-band), `armsmith.gate`, `armsmith.report`, `armsmith.witness` — no CLI required.
 - **Drop-in Arm CI gate** — `uses: edycutjong/armsmith@v1` on `runs-on: ubuntu-24.04-arm` (see
   [`action.yml`](action.yml)); the Marketplace *listing* is publish-pending, never claimed as live.
+- **Installable in one command** — [`armsmith` on PyPI](https://pypi.org/project/armsmith/):
+  `uvx armsmith scan .` runs the aarch64 anti-pattern scan on any repo with nothing to clone and
+  nothing to configure. Published from CI by [Trusted Publishing](.github/workflows/release.yml)
+  (OIDC, no API token in the repo), with sdist + wheel attached to every GitHub Release.
 
 ## 🗺️ Roadmap
 
