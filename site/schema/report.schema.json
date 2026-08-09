@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://armsmith.edycu.dev/schema/report.schema.json",
+  "title": "Armsmith diagnosis report",
+  "description": "Signed, tamper-evident record of one Armsmith diagnose run: findings, baseline measurements, per-fix reproduce-gate verdicts with raw samples embedded, host fingerprint, and provenance flags. schema_version 1.0.0.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "created_at",
+    "mode",
+    "synthetic",
+    "tool",
+    "scenario",
+    "repo",
+    "gate_config",
+    "findings",
+    "fixes"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["replay", "live"] },
+    "synthetic": {
+      "type": "boolean",
+      "description": "true when measurements come from a synthetic/replay bundle — such reports must never be presented as hardware results"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "armsmith" },
+        "version": { "type": "string" }
+      }
+    },
+    "scenario": { "type": "string" },
+    "repo": {
+      "type": "object",
+      "required": ["url", "sha"],
+      "properties": {
+        "url": { "type": "string" },
+        "sha": { "type": "string" }
+      }
+    },
+    "host": {
+      "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/host" }]
+    },
+    "gate_config": {
+      "type": "object",
+      "required": ["band_k", "min_samples", "require_output_hash"],
+      "properties": {
+        "band_k": { "type": "number", "exclusiveMinimum": 0 },
+        "min_samples": { "type": "integer", "minimum": 1 },
+        "require_output_hash": { "type": "boolean" },
+        "primary_metrics": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "array", "items": { "type": "string" } }
+          ]
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "plan": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "baseline": {
+      "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/measurement" }]
+    },
+    "fixes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fixResult" }
+    },
+    "artifacts": {
+      "type": "object",
+      "properties": {
+        "flamegraph_before": { "type": ["string", "null"] },
+        "flamegraph_after": { "type": ["string", "null"] },
+        "performix_ref": { "type": ["string", "null"] }
+      }
+    },
+    "cost": {
+      "type": "object",
+      "properties": {
+        "cost_usd": { "type": "number", "minimum": 0 },
+        "note": { "type": "string" }
+      }
+    },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "host": {
+      "type": "object",
+      "required": ["architecture", "model_name", "isa_feats", "source"],
+      "properties": {
+        "architecture": { "type": "string" },
+        "model_name": { "type": "string" },
+        "vendor": { "type": "string" },
+        "cpus": { "type": "integer", "minimum": 0 },
+        "isa_feats": { "type": "array", "items": { "type": "string" } },
+        "isa": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "instance": { "type": "string" },
+        "kernel": { "type": "string" },
+        "governor": { "type": "string" },
+        "source": {
+          "type": "string",
+          "description": "provenance label, e.g. replay[SYNTHETIC]: scenario-name"
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "required": ["rule_id", "status", "evidence"],
+      "properties": {
+        "rule_id": { "type": "string", "pattern": "^R\\d+$" },
+        "status": { "enum": ["matched", "clean", "skipped"] },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "locations": { "type": "array", "items": { "type": "string" } },
+        "fix": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/fixProposal" }] },
+        "skipped_reason": { "type": ["string", "null"] }
+      }
+    },
+    "fixProposal": {
+      "type": "object",
+      "required": ["rule_id", "kind", "description"],
+      "properties": {
+        "rule_id": { "type": "string" },
+        "kind": {
+          "enum": [
+            "dockerfile_edit",
+            "env_change",
+            "build_flag",
+            "pip_pin",
+            "config_patch",
+            "code_suggestion",
+            "quant_swap",
+            "ci_patch"
+          ]
+        },
+        "description": { "type": "string" },
+        "patch": { "type": ["string", "null"] },
+        "commands": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "sampleStats": {
+      "type": "object",
+      "required": ["n", "median", "mad", "smad", "p50", "p95", "mean", "stddev", "min", "max"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 1 },
+        "median": { "type": "number" },
+        "mad": { "type": "number" },
+        "smad": { "type": "number" },
+        "p50": { "type": "number" },
+        "p95": { "type": "number" },
+        "mean": { "type": "number" },
+        "stddev": { "type": "number" },
+        "min": { "type": "number" },
+        "max": { "type": "number" }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "required": ["variant", "instrument", "synthetic", "samples", "metrics_summary"],
+      "properties": {
+        "variant": { "type": "string" },
+        "instrument": { "type": "string" },
+        "rule_id": { "type": ["string", "null"] },
+        "synthetic": { "type": "boolean" },
+        "samples": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "number" },
+            "minItems": 1
+          }
+        },
+        "metrics_summary": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/sampleStats" }
+        },
+        "pmu": {
+          "type": "object",
+          "additionalProperties": { "type": "number" }
+        },
+        "output_sha256": { "type": ["string", "null"] }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "required": ["verdict", "direction", "band_k", "reason"],
+      "properties": {
+        "verdict": {
+          "enum": ["improved", "regressed", "no_change", "insufficient_samples"]
+        },
+        "direction": { "enum": ["lower_better", "higher_better"] },
+        "baseline": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/sampleStats" }] },
+        "candidate": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/sampleStats" }] },
+        "delta": { "type": ["number", "null"] },
+        "delta_pct": { "type": ["number", "null"] },
+        "band": { "type": ["number", "null"] },
+        "band_k": { "type": "number" },
+        "reason": { "type": "string" }
+      }
+    },
+    "fixResult": {
+      "type": "object",
+      "required": ["variant", "verdict", "reasons", "comparisons"],
+      "properties": {
+        "variant": { "type": "string" },
+        "rule_id": { "type": ["string", "null"] },
+        "verdict": { "enum": ["keep", "drop"] },
+        "reasons": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "comparisons": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/comparison" }
+        },
+        "pmu_delta": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "before": { "type": "number" },
+              "after": { "type": "number" },
+              "delta": { "type": "number" },
+              "delta_pct": { "type": ["number", "null"] }
+            }
+          }
+        },
+        "output_hash_equal": { "type": ["boolean", "null"] },
+        "measurement": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/measurement" }] }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "report_sha256", "signature_b64", "public_key_b64"],
+      "properties": {
+        "algorithm": { "const": "ed25519" },
+        "report_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signature_b64": { "type": "string", "minLength": 1 },
+        "public_key_b64": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

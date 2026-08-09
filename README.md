@@ -264,7 +264,7 @@ so the numbers above are re-derivable by anyone with the repo and an Arm runner 
 3. **Tamper-evident reports** (`armsmith.report`) — raw samples embedded next to every claimed
    statistic; canonical-JSON sha256 content addressing; ed25519 signature; `armsmith verify`
    *recomputes every statistic and gate verdict from the embedded samples*. Editing a number
-   without re-running the math is detectable. Schema: [`schema/report.schema.json`](schema/report.schema.json).
+   without re-running the math is detectable. Schema: [`schema/report.schema.json`](src/armsmith/schema/report.schema.json).
 4. **ISA witness** (`armsmith.witness`) — counts SDOT/UDOT/SMMLA/USMMLA in disassembly
    before/after: wall-clock can be argued with; emitted instructions cannot.
 5. **PR evidence** (`armsmith.evidence`, `armsmith.ghpr`) — the
@@ -399,9 +399,11 @@ DX clause and the rubric's reusable-artifacts Impact:
 - **13 x86→Arm migration templates** — `armsmith rules export --format md` renders one card per rule
   (anti-pattern · fix · expected gain · upstream citation · Arm Learning Path) into
   [`docs/migration-templates/`](docs/migration-templates/). Reusable on any repo.
-- **Add a 14th rule with zero core changes** — drop one YAML descriptor into
-  `src/armsmith/rules/packs/` + register a detector; the loader validates and wires it in.
-- **Public signed-report schema** — [`schema/report.schema.json`](schema/report.schema.json)
+- **Add a 14th rule without touching the engine** — one YAML descriptor into
+  `src/armsmith/rules/packs/`, one detector, one import line; the loader validates and wires it
+  in (see [CONTRIBUTING](.github/CONTRIBUTING.md#adding-a-rule-the-common-contribution) for the
+  exact `detect()` signature).
+- **Public signed-report schema** — [`schema/report.schema.json`](src/armsmith/schema/report.schema.json)
   (draft 2020-12, CI-validated). Build your own viewer/CI gate against it.
 - **Importable methodology modules** — `from armsmith.benchstats import compare` (median-of-N/MAD/
   noise-band), `armsmith.gate`, `armsmith.report`, `armsmith.witness` — no CLI required.

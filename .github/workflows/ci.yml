@@ -65,6 +65,11 @@ jobs:
         run: .venv/bin/armsmith ci --replay fixtures/replays/scenario_ragserve
       - name: Report schema is valid JSON Schema
         run: .venv/bin/python -c "import json, jsonschema; jsonschema.Draft202012Validator.check_schema(json.load(open('schema/report.schema.json')))"
+      # The schema declares $id https://armsmith.edycu.dev/schema/report.schema.json, so that URL
+      # has to actually serve it — site/ is the Vercel output root. Copy, don't symlink: Vercel
+      # would not follow one. This asserts the served copy never drifts from the packaged original.
+      - name: Published schema matches the packaged one ($id must not lie)
+        run: diff -u src/armsmith/schema/report.schema.json site/schema/report.schema.json
       - name: Dependency audit (pip-audit — advisory)
         run: |
           .venv/bin/pip install pip-audit
