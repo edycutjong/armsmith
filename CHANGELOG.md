@@ -1,6 +1,66 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-08-09)
+
+### Documentation
+
+- Lead with the PyPI install now that armsmith 1.0.4 is published
+  ([`15342ef`](https://github.com/edycutjong/armsmith/commit/15342efb2267b6188f2ba6b36523bf9837f0ed66))
+
+armsmith is on PyPI, published from CI via Trusted Publishing (OIDC, no token in the repo), with
+  sdist + wheel attached to the GitHub Release. Verified from a clean venv outside the repo: pip
+  install armsmith and uvx armsmith both resolve, load all 13 rule packs from inside the wheel, and
+  scan a repo they have never seen.
+
+Adoption previously meant 'git clone + pip install -e', which filters out every drive-by user. Now:
+
+uvx armsmith scan .
+
+- README and site quickstarts lead with the zero-install one-liner, with the clone kept for the path
+  that genuinely needs it: reproducing the gate against the replay bundles, which live in the repo.
+  - Installation section splits 'to use it' from 'to hack on it'. - PyPI version badge in the top
+  matter. - Reuse section names the install as a first-class artifact.
+
+Held back until the package actually resolved — advertising an install command that does not work is
+  the one claim this project cannot make.
+
+### Features
+
+- **record**: Capture a real replay bundle from the host you run on
+  ([`a2e1871`](https://github.com/edycutjong/armsmith/commit/a2e1871e84178a280a1c2428b3c212ce5d31ec2d))
+
+The largest gap in the tool: diagnose --replay was required, and no command produced a bundle. Ten
+  of thirteen rules and the CI gate could only ever run against fixtures shipped in this repo, so a
+  stranger got a three-rule static scan and nothing else. armsmith record closes that.
+
+armsmith record . --out ./bundle --python .venv/bin/python armsmith diagnose --replay ./bundle
+
+Captures what the host can honestly answer (lscpu, THP state, and the BLAS numpy reports for the
+  interpreter you name) and copies in verbatim any real instrument output you already have:
+  --build-log (R2), --pip-log (R8), --cmake-cache (R10), --gguf (R5), --perf (R9), --ort-session
+  (R7), --llama-bench + --hyperfine (R13).
+
+--python exists because R3 is a claim about the venv that serves YOUR model. Probing our own
+  interpreter would answer the wrong question; armsmith does not even depend on numpy.
+
+Honesty contract, enforced in code and asserted by tests: - manifest declares "synthetic": false —
+  nothing here is invented - env and proc_maps are NEVER captured, so R6 cannot run from a recorded
+  bundle and R11 stays half-fed. A bundle is published; an env block carries CI tokens and a maps
+  dump carries host paths. - anything unobserved is omitted, not guessed; record prints which rules
+  the bundle can and cannot answer before you run diagnose
+
+Fixes a provenance bug this surfaced: build_report derived synthetic from mode ('replay' implied
+  synthetic), conflating transport with provenance. A recorded bundle is replayed but real, and was
+  being stamped synthetic — understating a genuine measurement as badly as the reverse would
+  overstate one. The two are now separate axes and diagnose passes the manifest's own flag; the
+  fallback keeps existing callers unchanged.
+
+Verified end to end against a repo armsmith has never seen: recorded from
+  huggingface/text-generation-inference, R3 ran on real numpy config and returned clean, unavailable
+  probes skipped by name, report signed and VERIFY OK. 410 tests, 100% coverage.
+
+
 ## v1.0.4 (2026-08-09)
 
 ### Bug Fixes
