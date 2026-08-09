@@ -1,6 +1,82 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-08-09)
+
+### Continuous Integration
+
+- **release**: Link the pypi deployment to the package page
+  ([`aacd397`](https://github.com/edycutjong/armsmith/commit/aacd3975a1f1ae55aa1d577c4fed901fa03c5c0d))
+
+The Deployments panel showed a bare 'pypi' environment with nothing to click. environment.url points
+  it at the published package, so the entry resolves to https://pypi.org/project/armsmith/.
+
+Takes effect on the next publish; existing deployment records keep the url they were created with.
+
+- **release**: Only publish to PyPI when a version was actually cut
+  ([`024ce36`](https://github.com/edycutjong/armsmith/commit/024ce3648b55f036a7e474ea915ef5bd00a355e0))
+
+The release workflow fires after every successful ci run, and publish-pypi was gated only on the
+  PUBLISH_TO_PYPI variable — so it rebuilt and attempted a publish on every push regardless of
+  whether semantic-release cut anything. Three publish attempts and three deployment records inside
+  25 minutes, each a no-op saved only by skip-existing, and each one a deployment event.
+
+The release job now exposes semantic-release's own 'released' output and publish-pypi requires it.
+  Docs/chore/ci pushes stop touching PyPI entirely.
+
+### Documentation
+
+- Point the demo links at the re-cut video
+  ([`fb1497d`](https://github.com/edycutjong/armsmith/commit/fb1497dd08dc0947b95b0cb8094d38e096f872c6))
+
+Scene 6 of the demo was a replay-labelled -35% from the synthetic bundle. It is now the real
+  measurement: the live A/B on a Neoverse-N2 runner, SDOT 0 -> 1, -86.5%, gate keep, every figure
+  copied from the signed report-live.json CI artifact.
+
+Replaced rather than inserted because the rules cap the video at three minutes and the cut was
+  already 2:55.8. The new segment is frame-exact (497 frames, VO padded to the same 16.55s), so
+  nothing downstream moved.
+
+YouTube cannot swap the file on an existing upload, so the re-cut is a new id: vq15rK1iCww ->
+  JsT83BYMWd0.
+
+- **progress**: Record the shipped record command and the real test count
+  ([`3ff5eee`](https://github.com/edycutjong/armsmith/commit/3ff5eee5537a626c8a0482cc64c8a6a5eb2623c5))
+
+PROGRESS.md still said 234 tests (it is 410, at 100% line coverage) and still listed bundle
+  recording as owed. armsmith record shipped on 2026-08-09; what remains of that item is ssh://
+  targets only, so a laptop can record a bundle for a remote Arm box.
+
+The Action Marketplace listing stays described as publish-pending — that one is still true. Only
+  PyPI is published.
+
+### Features
+
+- **rules**: Put a real before/after diff in every actionable migration card
+  ([`8109236`](https://github.com/edycutjong/armsmith/commit/8109236521e1b2e11ac5e2fe4e8cf798ae07b618))
+
+The 13 cards were advertised as x86->Arm migration templates and as the rubric's reusable artifact,
+  but grep '```' across all of them returned zero — they were 23 lines of prose each. An index of
+  Arm Learning Path links is a useful thing, but it is not a template: you cannot paste a paragraph
+  into a Dockerfile.
+
+Rule descriptors now take optional before/after snippets plus a language to fence them in, and the
+  export renders a 'Before -> after' section. The smallest honest edit for each anti-pattern, e.g.
+  R12:
+
+platforms: linux/amd64 platforms: linux/amd64,linux/arm64
+
+11 of 13 rules carry one. R9 and R13 do not, on purpose: both are diagnostic — they tell you where
+  the time is going and redirect the optimization, rather than naming a specific line to change.
+  Inventing a snippet for them would be the same failure mode as inventing a measurement, so they
+  render no fence at all.
+
+The loader treats an empty string as absent, and a test asserts no rule ever ships half a pair — a
+  'before' with no 'after' renders an anti-pattern the reader has no fix for.
+
+414 tests, 100% coverage; counts synced across README, site, deck, CI and CONTRIBUTING.
+
+
 ## v1.1.0 (2026-08-09)
 
 ### Documentation
