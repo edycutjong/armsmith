@@ -402,3 +402,29 @@ def test_live_refused_kinds_never_reach_the_readers():
         assert probe.has(kind) is False
         with pytest.raises(ProbeMissing, match="refused in live mode"):
             probe.text(kind)
+
+
+def test_schema_path_falls_back_to_a_sibling_schema_dir(tmp_path, monkeypatch):
+    """The packaged copy wins, but the parent walk still resolves a schema that
+    sits beside the package rather than inside it.
+
+    This is the layout the project had before the schema was moved into the
+    package: `schema/` at the repo root, next to `src/`. Keeping the fallback
+    working means an editable install or a vendored checkout that never runs
+    the wheel build still validates reports instead of raising.
+    """
+    from armsmith import report as report_mod
+
+    pkg = tmp_path / "src" / "armsmith"
+    pkg.mkdir(parents=True)
+    fake_module = pkg / "report.py"
+    fake_module.write_text("", encoding="utf-8")
+
+    # No packaged copy under armsmith/schema/ — force the parent walk.
+    sibling = tmp_path / "schema"
+    sibling.mkdir()
+    schema_file = sibling / "report.schema.json"
+    schema_file.write_text('{"type": "object"}', encoding="utf-8")
+
+    monkeypatch.setattr(report_mod, "__file__", str(fake_module))
+    assert report_mod.schema_path() == schema_file

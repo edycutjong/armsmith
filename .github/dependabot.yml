@@ -1,12 +1,38 @@
+# Grouped, monthly, no major bumps.
+#
+# The previous setting (weekly, ungrouped, limit 10, majors allowed) produced
+# exactly the failure mode it is known for: four open PRs sat unattended, one
+# had drifted into a merge conflict behind the others, and one still displayed
+# a red run from before the repo went public. Ungrouped weekly updates arrive
+# faster than anyone merges them.
+#
+# Majors are ignored deliberately. `actions/checkout` 4→7 and
+# `github/codeql-action` 3→4 are migrations, not maintenance — on a frozen
+# submission they break CI for no benefit, and they cannot be merged
+# unattended. Security alerts are a SEPARATE channel and stay fully on; this
+# file only governs version updates.
 version: 2
 updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
+      interval: "monthly"
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

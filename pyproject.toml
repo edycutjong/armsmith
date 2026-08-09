@@ -47,7 +47,10 @@ Homepage = "https://armsmith.edycu.dev"
 where = ["src"]
 
 [tool.setuptools.package-data]
-armsmith = ["rules/packs/*.yaml"]
+# The schema MUST be inside the package: data outside the package directory
+# never reaches a wheel, and an installed armsmith that cannot load its own
+# schema silently validates nothing.
+armsmith = ["rules/packs/*.yaml", "schema/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

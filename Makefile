@@ -7,7 +7,7 @@ help:
 	@echo "  install    - editable install with dev extras"
 	@echo "  lint       - ruff check (gate)"
 	@echo "  typecheck  - mypy (advisory)"
-	@echo "  test       - pytest (219 tests, offline)"
+	@echo "  test       - pytest (384 tests, offline)"
 	@echo "  coverage   - pytest with coverage report"
 	@echo "  e2e        - full offline loop (scripts/verify_offline.py)"
 	@echo "  ci-gate    - reproduce-gate CI twin on the replay bundle"

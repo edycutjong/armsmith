@@ -339,7 +339,21 @@ def verify_report(
 # ---------------------------------------------------------------------------
 
 def schema_path() -> Path:
-    """Locate schema/report.schema.json (repo checkout or installed layout)."""
+    """Locate report.schema.json (installed wheel or repo checkout).
+
+    The packaged copy is checked first and is the canonical one. It lives inside
+    the package precisely so it ships in a wheel: data outside the package
+    directory cannot, and an installed armsmith that cannot find its own schema
+    validates nothing. The repo root keeps a `schema/` symlink to this same
+    file, so the public path stays valid for a checkout without a second copy
+    that could drift.
+
+    The parent walk remains as a fallback for layouts that place the schema
+    beside the package rather than within it.
+    """
+    packaged = Path(__file__).resolve().parent / "schema" / "report.schema.json"
+    if packaged.is_file():
+        return packaged
     here = Path(__file__).resolve()
     for parent in here.parents:
         candidate = parent / "schema" / "report.schema.json"

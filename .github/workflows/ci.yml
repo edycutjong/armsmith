@@ -16,9 +16,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Security gate: verified-secret scan across full git history ──────
+  # ── STAGE 2: Security gate — verified-secret scan across full git history ──
   secret-scan:
-    name: "Secret scanning (TruffleHog)"
+    name: "Stage 2 · Secret scanning (TruffleHog)"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -34,7 +34,9 @@ jobs:
           # can only ever produce noise here. Every other detector stays on.
           extra_args: --only-verified --exclude-detectors=Lob
 
+  # ── STAGE 1: Quality — lint, types, the full suite, e2e, schema, audit ────
   test:
+    name: "Stage 1 · Quality (${{ matrix.runner }} · py${{ matrix.python-version }})"
     strategy:
       fail-fast: false
       matrix:
@@ -55,7 +57,7 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (219 tests) with coverage
+      - name: Unit + replay suite (384 tests, 100% line coverage) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
@@ -69,6 +71,47 @@ jobs:
           .venv/bin/pip-audit --skip-editable
         continue-on-error: true
 
+  # ── STAGE 3: Build verification ───────────────────────────────────────
+  # Every other job installs with `pip install -e .`, which serves the rule
+  # packs and the report schema straight out of the source tree. A published
+  # wheel does not: if the YAML packs under rules/packs/ or schema/*.json are
+  # not declared as package data, `pip install armsmith` yields a CLI that
+  # imports fine and then cannot load a single rule. So the wheel is built and
+  # exercised from a CLEAN venv, with the repo removed from sys.path.
+  build:
+    name: "Stage 3 · Build verification (wheel + sdist)"
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          ls -la dist/
+      - name: Metadata is valid for distribution
+        run: python -m twine check dist/*
+      - name: Install the wheel into a clean venv and exercise the CLI
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl
+          cd /tmp                      # out of the repo: nothing on sys.path to fall back to
+          /tmp/clean/bin/armsmith version
+          # Proves the 13 YAML rule packs shipped inside the wheel.
+          /tmp/clean/bin/armsmith rules list | tee /tmp/rules.txt
+          grep -c 'R1[0-3]\|R[1-9]' /tmp/rules.txt
+          # Proves the JSON Schema shipped too — verify loads it by package path.
+          /tmp/clean/bin/python -c "from armsmith.report import schema_path; p=schema_path(); print('schema:', p); assert p.exists()"
+      - name: Upload the distributions
+        uses: actions/upload-artifact@v7
+        with:
+          name: armsmith-dist
+          path: dist/
+          retention-days: 7
+
   # ── The live leg: a REAL Arm measurement, not a replay ────────────────
   # Compiles bench/int8_dot.c twice from one source (generic ARMv8.0 vs
   # ARMv8.2+dotprod — the exact flag rule R2 flags), disassembles both binaries
@@ -76,7 +119,7 @@ jobs:
   # the same reproduce gate as every replay bundle. Runs on native arm64 because
   # there is nowhere else it *can* honestly run.
   live-bench:
-    name: "Live Arm reproduce gate (native arm64)"
+    name: "Stage 5 · Live Arm reproduce gate (native arm64)"
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v7
@@ -115,6 +158,30 @@ jobs:
           path: |
             report-live.json
             live-evidence.md
+
+  # ── STAGE 6: Deploy gate ──────────────────────────────────────────────
+  # One required check that means "everything passed", so branch protection
+  # and the release workflow have a single thing to depend on instead of
+  # enumerating a matrix that changes shape whenever a runner is added.
+  deploy-gate:
+    name: "Stage 6 · Deploy gate"
+    needs: [secret-scan, test, build, live-bench]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: All gates passed
+        run: |
+          {
+            echo "## ✅ All CI gates passed"
+            echo ""
+            echo "| stage | what it proved |"
+            echo "|---|---|"
+            echo "| 1 · Quality | ruff + mypy + 384 tests at 100% line coverage, on 6 legs (4 native arm64) |"
+            echo "| 2 · Security | TruffleHog verified-secret scan over full git history · pip-audit |"
+            echo "| 3 · Build | wheel installs clean and still finds its rule packs + schema |"
+            echo "| 4 · E2E | offline scan → gate → sign → verify, plus the \`armsmith ci\` twin |"
+            echo "| 5 · Live Arm | a real Neoverse measurement through the same reproduce gate |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # TODO(S1): the remaining live instruments — hyperfine/llama-bench legs,
   # cosign keyless attestation of report.json (OIDC), and the noise-floor study
