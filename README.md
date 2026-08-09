@@ -17,7 +17,8 @@
   [![Demo Video](https://img.shields.io/badge/▶_Demo-3_min-ef4444?style=for-the-badge)](https://youtu.be/vq15rK1iCww)
   [![Live Demo](https://img.shields.io/badge/🚀_Live-Demo-06b6d4?style=for-the-badge)](https://armsmith.edycu.dev)
   [![Pitch Deck](https://img.shields.io/badge/📊_Pitch-Deck-f59e0b?style=for-the-badge)](https://armsmith.edycu.dev/deck.html)
-  [![Built for Arm AI Optimization Challenge](https://img.shields.io/badge/Devpost-Arm_AI_Challenge-8b5cf6?style=for-the-badge)](https://arm-ai-optimization-challenge.devpost.com/)
+  [![Devpost Submission](https://img.shields.io/badge/Devpost-View_Submission-003E54?style=for-the-badge&logo=devpost&logoColor=white)](https://devpost.com/software/armsmith-7j1lzt)
+  [![Built for Arm AI Optimization Challenge](https://img.shields.io/badge/Arm_AI_Challenge-Cloud_AI-8b5cf6?style=for-the-badge)](https://arm-ai-optimization-challenge.devpost.com/)
 
   <br/>
 
