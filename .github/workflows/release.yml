@@ -57,6 +57,17 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      # `version` above builds dist/ and creates the GitHub Release, but it does
+      # NOT attach the artifacts: upload_to_vcs_release is honoured by the
+      # separate `publish` command. Without this step the sdist+wheel are built
+      # and then discarded, and the Release page carries no downloads.
+      - name: Attach sdist + wheel to the GitHub Release
+        if: steps.semrel.outputs.released == 'true'
+        uses: python-semantic-release/publish-action@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.semrel.outputs.tag }}
+
       - name: Keep the floating v1 tag on the newest v1.x release
         # `uses: edycutjong/armsmith@v1` is the documented way to consume the
         # composite action, so v1 has to exist and has to track the latest 1.x.
