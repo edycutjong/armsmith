@@ -573,7 +573,8 @@ DX clause and the rubric's reusable-artifacts Impact:
   reference in [`docs/API.md`](docs/API.md) (median-of-N/MAD/
   noise-band), `armsmith.gate`, `armsmith.report`, `armsmith.witness` — no CLI required.
 - **Drop-in Arm CI gate** — `uses: edycutjong/armsmith@v1` on `runs-on: ubuntu-24.04-arm` (see
-  [`action.yml`](action.yml)); the Marketplace *listing* is publish-pending, never claimed as live.
+  [`action.yml`](action.yml)) — published on the
+  [GitHub Marketplace](https://github.com/marketplace/actions/armsmith-arm-performance-gate).
 - **Installable in one command** — [`armsmith` on PyPI](https://pypi.org/project/armsmith/):
   `uvx armsmith scan .` runs the aarch64 anti-pattern scan on any repo with nothing to clone and
   nothing to configure. Published from CI by [Trusted Publishing](.github/workflows/release.yml)

@@ -19,7 +19,8 @@
 #
 # Live-target mode (armsmith diagnose <repo> --target ssh://…) is TODO(S1);
 # this action gates on a recorded bundle today and never fabricates a
-# hardware measurement. The formal Marketplace listing is publish-pending.
+# hardware measurement. Published on the GitHub Marketplace as
+# "Armsmith Arm performance gate".
 name: "Armsmith Arm performance gate"
 description: "Fail CI on an Arm performance regression, proven by the reproduce gate (median-of-N · MAD noise band · output-hash equality)."
 branding:
