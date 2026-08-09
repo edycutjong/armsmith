@@ -21,3 +21,8 @@ gain_note: >
 citation_url: https://gcc.gnu.org/onlinedocs/gcc/AArch64-Options.html
 confidence: medium
 learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/cplusplus_compilers_flags/
+snippet_lang: bash
+before: |
+  CFLAGS="-O3"
+after: |
+  CFLAGS="-O3 -mcpu=native"      # or, for portable builds: -march=armv8.2-a+dotprod+i8mm

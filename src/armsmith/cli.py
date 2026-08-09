@@ -375,11 +375,19 @@ def rules_export(
         )
         if spec.learning_path:
             lp_count += 1
+        snippet = (
+            f"## Before → after\n\n"
+            f"```{spec.snippet_lang}\n{spec.before}\n```\n\n"
+            f"```{spec.snippet_lang}\n{spec.after}\n```\n\n"
+            if spec.has_snippet
+            else ""
+        )
         card = (
             f"# {spec.id} — {spec.title}\n\n"
             f"> x86→Arm/Graviton migration template · kind: `{spec.kind}` · confidence: {spec.confidence} · "
             f"expected gain (estimate): {lo:g}–{hi:g}×\n\n"
             f"## Anti-pattern\n\n{spec.summary}\n\n"
+            f"{snippet}"
             f"## Fix\n\n{spec.fix_generator}\n\n"
             f"## Expected gain\n\n{lo:g}–{hi:g}× — {spec.gain_note}\n\n"
             f"> Estimates are for planning order only. Only Armsmith's reproduce gate "

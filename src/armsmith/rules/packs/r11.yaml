@@ -18,3 +18,10 @@ gain_note: >
   often small; in-band results are reported as "no change" and dropped.
 citation_url: https://www.kernel.org/doc/html/latest/admin-guide/mm/transhuge.html
 confidence: medium
+snippet_lang: bash
+before: |
+  cat /sys/kernel/mm/transparent_hugepage/enabled
+  # always madvise [never]
+after: |
+  echo madvise | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
+  export LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libjemalloc.so.2

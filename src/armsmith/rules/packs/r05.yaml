@@ -20,3 +20,8 @@ gain_note: >
 citation_url: https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md
 confidence: medium
 learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/llama-cpu/
+snippet_lang: bash
+before: |
+  llama-cli -m model-Q4_K_M.gguf           # K-quant: no runtime repack on this host
+after: |
+  llama-cli -m model-Q4_0.gguf             # Q4_0 engages the dotprod/i8mm repack path

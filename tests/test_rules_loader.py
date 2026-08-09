@@ -82,3 +82,39 @@ def test_non_https_citation_rejected(tmp_path):
     )
     with pytest.raises(ValueError, match="https"):
         load_pack(pack_dir=tmp_path, require_detectors=False)
+
+
+# --- migration-template snippets ---------------------------------------------
+
+def test_rules_never_ship_half_a_snippet():
+    """A `before` with no `after` would render an anti-pattern with no fix."""
+    from armsmith.rules import load_pack
+
+    for spec in load_pack().values():
+        assert bool(spec.before) == bool(spec.after), f"{spec.id} has half a snippet"
+        assert spec.has_snippet == bool(spec.before)
+
+
+def test_actionable_rules_carry_a_paste_able_diff():
+    """The cards are advertised as migration templates, so most must contain code.
+
+    R9 and R13 are diagnostic — they redirect where you optimize rather than
+    naming a specific edit — so they honestly carry no snippet.
+    """
+    from armsmith.rules import load_pack
+
+    specs = load_pack()
+    diagnostic = {"R9", "R13"}
+    with_snippet = {rid for rid, s in specs.items() if s.has_snippet}
+    assert with_snippet == set(specs) - diagnostic
+    for rid in with_snippet:
+        assert specs[rid].snippet_lang != "text", f"{rid} snippet has no language to fence with"
+
+
+def test_empty_snippet_string_is_treated_as_absent():
+    """An empty YAML value must not render an empty code fence."""
+    from armsmith.rules import _snippet
+
+    assert _snippet({"before": ""}, "before") is None
+    assert _snippet({}, "before") is None
+    assert _snippet({"before": "x\n\n"}, "before") == "x"

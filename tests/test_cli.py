@@ -293,3 +293,21 @@ def test_record_says_none_when_it_can_capture_nothing(tmp_path, monkeypatch):
     assert "0 probes captured" in res.output
     assert "none" in res.output
     assert list((out / "probes").iterdir()) == []      # nothing invented
+
+
+def test_rules_export_cards_contain_a_real_before_after_diff(tmp_path):
+    """The rubric asks for migration templates; an index of links is not one."""
+    out = tmp_path / "cards"
+    res = runner.invoke(app, ["rules", "export", "--format", "md", "--out-dir", str(out)])
+    assert res.exit_code == 0, res.output
+
+    r12 = (out / "R12.md").read_text()
+    assert "## Before → after" in r12
+    assert "```yaml" in r12
+    assert "platforms: linux/amd64\n```" in r12          # the anti-pattern
+    assert "platforms: linux/amd64,linux/arm64" in r12   # the fix
+
+    # Diagnostic rules name no specific edit, so they render no fence at all
+    # rather than an invented one.
+    assert "## Before → after" not in (out / "R13.md").read_text()
+    assert "```" not in (out / "R13.md").read_text()

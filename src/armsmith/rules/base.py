@@ -54,6 +54,17 @@ class RuleSpec:
     #: "learning-ready content"). None where no strong Arm LP exists — those
     #: rules honestly cite only their upstream ``citation_url``.
     learning_path: str | None = None
+    #: The migration template proper: the smallest honest before/after edit for
+    #: this anti-pattern, and the language to fence it in. A card without these
+    #: is an index entry, not a template — you cannot paste a paragraph. Both
+    #: must be present or neither is rendered.
+    before: str | None = None
+    after: str | None = None
+    snippet_lang: str = "text"
+
+    @property
+    def has_snippet(self) -> bool:
+        return bool(self.before and self.after)
 
     def gain_midpoint(self) -> float:
         lo, hi = self.expected_gain_range
@@ -72,6 +83,9 @@ class RuleSpec:
             "citation_url": self.citation_url,
             "learning_path": self.learning_path,
             "confidence": self.confidence,
+            "before": self.before,
+            "after": self.after,
+            "snippet_lang": self.snippet_lang,
         }
 
 

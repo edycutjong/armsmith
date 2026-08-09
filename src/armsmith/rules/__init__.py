@@ -90,7 +90,21 @@ def _parse_descriptor(path: Path) -> RuleSpec:
         citation_url=url,
         learning_path=lp,
         confidence=str(data["confidence"]),
+        # Optional: a rule may ship without a snippet, but never with half of
+        # one — a "before" with no "after" would render an anti-pattern the
+        # reader has no fix for.
+        before=_snippet(data, "before"),
+        after=_snippet(data, "after"),
+        snippet_lang=str(data.get("snippet_lang", "text")),
     )
+
+
+def _snippet(data: dict, key: str) -> str | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    text = str(value).rstrip("\n")
+    return text or None
 
 
 def _import_detectors() -> None:

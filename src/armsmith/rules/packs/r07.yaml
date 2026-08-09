@@ -19,3 +19,12 @@ gain_note: >
 citation_url: https://onnxruntime.ai/docs/performance/tune-performance/threading.html
 confidence: high
 learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/onnx/
+snippet_lang: python
+before: |
+  sess = ort.InferenceSession(model)       # every session option left on defaults
+after: |
+  so = ort.SessionOptions()
+  so.intra_op_num_threads = 2              # floor(nproc / workers)
+  so.inter_op_num_threads = 1
+  so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+  sess = ort.InferenceSession(model, so)

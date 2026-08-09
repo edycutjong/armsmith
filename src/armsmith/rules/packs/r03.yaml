@@ -18,3 +18,8 @@ gain_note: >
   GEMM-heavy embed paths). Only gate-measured deltas are ever claimed.
 citation_url: https://numpy.org/doc/stable/reference/generated/numpy.show_config.html
 confidence: high
+snippet_lang: bash
+before: |
+  pip install --no-binary numpy numpy    # builds against whatever BLAS is on the box
+after: |
+  pip install --only-binary=:all: numpy  # manylinux aarch64 wheel, OpenBLAS bundled

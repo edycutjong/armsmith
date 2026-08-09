@@ -22,3 +22,12 @@ gain_note: >
 citation_url: https://github.com/docker/build-push-action
 confidence: high
 learning_path: https://learn.arm.com/learning-paths/servers-and-cloud-computing/multiarch_nginx_on_aks/
+snippet_lang: yaml
+before: |
+  - uses: docker/build-push-action@v6
+    with:
+      platforms: linux/amd64
+after: |
+  - uses: docker/build-push-action@v6
+    with:
+      platforms: linux/amd64,linux/arm64

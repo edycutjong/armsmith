@@ -18,3 +18,8 @@ gain_note: >
   measures the wheel-vs-sdist delta directly.
 citation_url: https://pip.pypa.io/en/stable/cli/pip_install/
 confidence: medium
+snippet_lang: bash
+before: |
+  pip install pillow==9.0.0                # no aarch64 wheel -> compiles from sdist
+after: |
+  pip install --only-binary=:all: "pillow>=10.2"   # fails loudly instead of building
