@@ -1,0 +1,57 @@
+# Automatic semantic versioning.
+#
+# Reads Conventional Commit subjects since the last tag, decides the bump,
+# rewrites the version in pyproject.toml AND src/armsmith/__init__.py, commits,
+# tags, and publishes a GitHub Release with generated notes.
+#
+#   fix: / perf:      -> patch   1.0.0 -> 1.0.1
+#   feat:             -> minor   1.0.0 -> 1.1.0
+#   BREAKING CHANGE:  -> major   1.0.0 -> 2.0.0
+#   docs/chore/ci/... -> no release
+#
+# NO SECRETS ARE REQUIRED. The built-in GITHUB_TOKEN is enough; the repository's
+# default workflow permission is `read`, so `contents: write` is granted at the
+# job level below rather than by changing a repo-wide setting.
+
+name: release
+
+on:
+  # Chained off ci rather than firing on push: a release must never be cut from
+  # a red build. workflow_run only fires for workflows on the default branch.
+  workflow_run:
+    workflows: ["ci"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # Skip when ci failed or was cancelled. Manual runs have no workflow_run
+    # payload, so allow those through explicitly.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write        # push the version commit + tag, create the Release
+    concurrency:
+      group: release
+      cancel-in-progress: false   # never abort a half-published release
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          # Full history + tags: semantic-release derives the next version from
+          # the commits since the last tag. A shallow clone silently yields the
+          # wrong bump.
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Python Semantic Release
+        uses: python-semantic-release/python-semantic-release@v9
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}

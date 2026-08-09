@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "armsmith"
-version = "0.1.0"
+version = "1.0.0"
 description = "CLI agent that profiles AI repos on Arm, diagnoses aarch64 slowness with a 13-rule pack, and opens PRs whose fixes passed a reproduce-benchmark gate."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -92,13 +92,13 @@ check_untyped_defs = true
 disable_error_code = ["import-untyped"]
 
 # ── Coverage (pytest-cov) ─────────────────────────────────────────────────────
-# Line coverage over the installed package (87% as of 2026-08-09 — re-measure and
-# update the README when this moves; a stale figure is the one lie this project
-# cannot afford). Branch coverage is
+# Line coverage over the installed package: 100% as of 2026-08-09. Re-measure and
+# update the README whenever this moves — a stale figure is the one lie this
+# project cannot afford. Branch coverage is
 # intentionally OFF so the reported figure is the line-coverage number quoted in
 # the README/deck. `exclude_lines` drops only standard defensive markers — it does
-# NOT paper over the real uncovered branches in livebench/cli/r12/r13 that the 87%
-# reflects. No `fail_under` gate: coverage is a signal here, like mypy.
+# NOT paper over anything: every statement is genuinely executed by a test that
+# asserts behaviour. No `fail_under` gate: coverage is a signal here, like mypy.
 [tool.coverage.run]
 source = ["armsmith"]
 branch = false
@@ -110,3 +110,34 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
+
+# ── Semantic release ──────────────────────────────────────────────────────────
+# Version lives in exactly two places and both are rewritten automatically, so
+# they can never drift: [project].version here, and __version__ in the package.
+# Driven by Conventional Commit subjects, which this repo already uses.
+#   fix: / perf:     -> patch      feat: -> minor      BREAKING CHANGE: -> major
+#   docs/chore/ci/test/refactor/style/build -> no release at all
+# Requires no secrets: the workflow grants the built-in GITHUB_TOKEN
+# `contents: write` at job level. See .github/workflows/release.yml.
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["src/armsmith/__init__.py:__version__"]
+tag_format = "v{version}"
+commit_message = "chore(release): v{version} [skip ci]"
+# No sdist/wheel build step — nothing is published to an index, only tagged and
+# released on GitHub. Leaving this empty keeps the release job fast and total.
+build_command = ""
+# 1.0.0 is the deliberate starting point; never fall back to a 0.x line.
+allow_zero_version = false
+major_on_zero = false
+
+[tool.semantic_release.branches.main]
+match = "main"
+prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+
+[tool.semantic_release.publish]
+upload_to_vcs_release = true

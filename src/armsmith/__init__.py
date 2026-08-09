@@ -7,4 +7,4 @@ S1+ items and are marked TODO(S1) — this codebase never fabricates hardware
 results.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

@@ -12,9 +12,14 @@ SCENARIO = str(FIXTURES / "replays" / "scenario_ragserve")
 
 
 def test_version():
+    # Asserted against the package's own __version__, never a hardcoded string:
+    # semantic-release rewrites the version on every release, and a literal here
+    # would turn each one into a red build.
+    from armsmith import __version__
+
     res = runner.invoke(app, ["version"])
     assert res.exit_code == 0
-    assert "armsmith 0.1.0" in res.output
+    assert f"armsmith {__version__}" in res.output
 
 
 def test_rules_list_shows_all_13():
