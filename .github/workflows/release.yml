@@ -52,6 +52,52 @@ jobs:
           persist-credentials: true
 
       - name: Python Semantic Release
+        id: semrel
         uses: python-semantic-release/python-semantic-release@v9
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Keep the floating v1 tag on the newest v1.x release
+        # `uses: edycutjong/armsmith@v1` is the documented way to consume the
+        # composite action, so v1 has to exist and has to track the latest 1.x.
+        # Without this it is a dangling reference and the action fails to resolve.
+        if: steps.semrel.outputs.released == 'true'
+        run: |
+          git tag -f v1
+          git push -f origin v1
+
+  # ── Publish to PyPI ───────────────────────────────────────────────────────
+  # Trusted Publishing (OIDC) — no API token, no long-lived secret in the repo.
+  # Gated on a repository variable so the job is inert until the PyPI-side
+  # trusted publisher exists; a missing publisher would otherwise fail the run
+  # and paint the release red for something that is purely account setup.
+  #
+  # To turn it on (once):
+  #   1. pypi.org → Your projects → Publishing → add a pending publisher
+  #        owner: edycutjong   repo: armsmith
+  #        workflow: release.yml   environment: pypi
+  #   2. gh variable set PUBLISH_TO_PYPI --body true -R edycutjong/armsmith
+  publish-pypi:
+    name: "Publish to PyPI"
+    needs: [release]
+    if: vars.PUBLISH_TO_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write        # required for Trusted Publishing
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade build
+          python -m build
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

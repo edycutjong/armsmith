@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "armsmith"
 version = "1.0.2"
-description = "CLI agent that profiles AI repos on Arm, diagnoses aarch64 slowness with a 13-rule pack, and opens PRs whose fixes passed a reproduce-benchmark gate."
+description = "CLI agent that profiles AI repos on Arm, diagnoses aarch64 slowness with a 13-rule pack, and drafts PRs whose fixes passed a reproduce-benchmark gate."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -127,9 +127,9 @@ version_toml = ["pyproject.toml:project.version"]
 version_variables = ["src/armsmith/__init__.py:__version__"]
 tag_format = "v{version}"
 commit_message = "chore(release): v{version} [skip ci]"
-# No sdist/wheel build step — nothing is published to an index, only tagged and
-# released on GitHub. Leaving this empty keeps the release job fast and total.
-build_command = ""
+# Build the sdist + wheel during the release so the artifacts exist for both the
+# GitHub Release and the PyPI publish job (see .github/workflows/release.yml).
+build_command = "python -m pip install build && python -m build"
 # 1.0.0 is the deliberate starting point; never fall back to a 0.x line.
 allow_zero_version = false
 major_on_zero = false
