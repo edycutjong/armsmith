@@ -5,7 +5,7 @@
 # outside its noise band. Intended for `runs-on: ubuntu-24.04-arm` (free native
 # arm64 hosted runner) so the gate executes on the target ISA.
 #
-#   - uses: edycu/armsmith@v1
+#   - uses: edycutjong/armsmith@v1
 #     with:
 #       replay: fixtures/replays/scenario_ragserve
 #
