@@ -158,13 +158,15 @@ jobs:
       # paths compute identical arithmetic so the gate would drop any divergence
       # on output-hash inequality.
       #
-      # --require-witness is deliberately absent on this first landing: it is
-      # asserted below by reading the report, so an unexpected toolchain result
-      # is REPORTED rather than turning the whole build red.
+      # --require-witness is ON: run 31303... measured SMMLA 0 -> 1 on this
+      # runner, so the instruction is proven to emit here. If a future
+      # toolchain silently stops emitting it, the premise of this case is gone
+      # and the build should say so rather than quietly measure nothing.
       - name: Live A/B #2 — SMMLA under +i8mm (native arm64)
         run: |
           .venv/bin/armsmith bench-live \
             --case mmla \
+            --require-witness \
             --instance "github-hosted:ubuntu-24.04-arm" \
             --out report-live-mmla.json \
             --markdown live-evidence-mmla.md
