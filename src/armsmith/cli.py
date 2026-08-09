@@ -180,6 +180,11 @@ def scan(
     strict: bool = typer.Option(
         False, "--strict", help="Exit non-zero if any anti-pattern is matched (CI use)."
     ),
+    as_json: bool = typer.Option(
+        False, "--json",
+        help="Emit every match as JSON on stdout (all evidence lines, not one per rule) "
+             "so the scan can feed CI annotations, dashboards or triage.",
+    ),
 ) -> None:
     """Static-only aarch64 anti-pattern scan (R1 amd64 image · R4 float64 coercion ·
     R12 CI matrix). Runs on a real directory with no probes and no Arm hardware — the
@@ -192,6 +197,47 @@ def scan(
     specs = load_pack()
     findings = {f.rule_id: f for f in run_all(specs, target, None)}  # probe=None → probe rules skip
     static_ids = [rid for rid, spec in specs.items() if spec.kind == "static"]
+
+    if as_json:
+        # EVERY match, not the one exemplar the table shows: a table is for a
+        # human, JSON is for a pipeline, and truncating it there would make the
+        # scan look cleaner than the repo is.
+        import json as _json
+
+        payload = {
+            "tool": {"name": "armsmith", "version": __version__},
+            "target": str(target),
+            "rules": [
+                {
+                    "rule_id": rid,
+                    "title": specs[rid].title,
+                    "status": findings[rid].status.value,
+                    "citation_url": specs[rid].citation_url,
+                    "learning_path": specs[rid].learning_path,
+                    "evidence": list(findings[rid].evidence),
+                    "locations": list(findings[rid].locations),
+                    "fix": (
+                        {
+                            "kind": findings[rid].fix.kind,
+                            "description": findings[rid].fix.description,
+                            "patch": findings[rid].fix.patch,
+                        }
+                        if findings[rid].fix
+                        else None
+                    ),
+                }
+                for rid in static_ids
+            ],
+            "matched": sum(1 for rid in static_ids if findings[rid].matched),
+            "note": (
+                "static rules only — probe rules (R2/R3/R5–R11/R13) need a bundle; "
+                "make one with `armsmith record`"
+            ),
+        }
+        console.print_json(_json.dumps(payload))
+        if strict and payload["matched"]:
+            raise typer.Exit(code=1)
+        return
 
     table = Table(title=f"Static scan — {target}")
     table.add_column("rule")
@@ -295,6 +341,13 @@ def record(
         + (f"[green]{', '.join(enabled)}[/green]" if enabled else "[dim]none[/dim]")
         + " · static rules R1/R4/R12 always run"
     )
+    if not result.captured_kinds:
+        console.print(
+            "[yellow]0 probes captured on this host.[/yellow] The probe rules read Linux-only "
+            "sources (lscpu, the THP sysfs node), so on macOS this bundle is valid but empty — "
+            "by design, rather than inventing values. Record on the Linux box you want diagnosed, "
+            "or pass real instrument output with --build-log/--pip-log/--cmake-cache/etc."
+        )
     console.print(
         f"next: [bold]armsmith diagnose --replay {result.bundle_dir}[/bold]"
     )

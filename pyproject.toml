@@ -55,7 +55,7 @@ where = ["src"]
 # The schema MUST be inside the package: data outside the package directory
 # never reaches a wheel, and an installed armsmith that cannot load its own
 # schema silently validates nothing.
-armsmith = ["rules/packs/*.yaml", "schema/*.json"]
+armsmith = ["rules/packs/*.yaml", "schema/*.json", "bench/*.c"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

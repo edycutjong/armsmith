@@ -113,12 +113,24 @@ def _classify(ctor: str, call: ast.Call) -> str:
     return UNPROVABLE
 
 
+#: Methods that pin the dtype of whatever they are called on, making the
+#: constructor's default irrelevant.
+_DTYPE_CASTS = {"astype", "view"}
+
+
+def _is_dtype_cast(call: ast.Call) -> bool:
+    """True for ``<expr>.astype(...)`` / ``<expr>.view(...)``."""
+    return isinstance(call.func, ast.Attribute) and call.func.attr in _DTYPE_CASTS
+
+
 class _NumpyAliasVisitor(ast.NodeVisitor):
     def __init__(self) -> None:
         self.module_aliases: set[str] = set()     # numpy, np, ...
         self.func_aliases: dict[str, str] = {}    # local name -> ctor name
         # (line, col, call repr, PROVEN|UNPROVABLE)
         self.hits: list[tuple[int, int, str, str]] = []
+        #: ids of ctor calls whose dtype is pinned by a chained .astype()
+        self._casted: set[int] = set()
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -148,8 +160,19 @@ class _NumpyAliasVisitor(ast.NodeVisitor):
         return None
 
     def visit_Call(self, node: ast.Call) -> None:
+        # `np.array(x).astype(np.float32)` pins the dtype one call later, so the
+        # constructor's own default never survives. Reporting it is a false
+        # positive on perfectly correct code — found on onnx's
+        # backend/test/case/model/gradient.py.
+        # NodeVisitor reaches the OUTER call before descending, so the inner
+        # constructor is already marked by the time it is visited.
+        if _is_dtype_cast(node):
+            inner = node.func.value
+            if isinstance(inner, ast.Call):
+                self._casted.add(id(inner))
+
         found = self._ctor_name(node)
-        if found is not None:
+        if found is not None and id(node) not in self._casted:
             display, ctor = found
             has_dtype = any(kw.arg == "dtype" for kw in node.keywords)
             if not has_dtype:

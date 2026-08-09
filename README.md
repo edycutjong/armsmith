@@ -25,7 +25,7 @@
   [![CI](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/edycutjong/armsmith?sort=semver&logo=semanticrelease&logoColor=white&color=2EE6A6)](https://github.com/edycutjong/armsmith/releases)
   [![PyPI](https://img.shields.io/pypi/v/armsmith?logo=pypi&logoColor=white&color=3775A9)](https://pypi.org/project/armsmith/)
-  ![449 tests passing](https://img.shields.io/badge/tests-449%20passing-brightgreen)
+  ![455 tests passing](https://img.shields.io/badge/tests-455%20passing-brightgreen)
   ![coverage 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)
   ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat&logo=python&logoColor=white)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
@@ -48,8 +48,12 @@
 Armsmith profiles an AI repo on Arm, diagnoses *why*
 it is slow on aarch64 with a 13-rule anti-pattern pack, drafts fixes, and renders a PR in which
 **every fix has passed a reproduce-benchmark gate** — median-of-N, MAD noise bands, output-hash
-equality. **The LLM plans; the silicon decides.** In-band deltas are reported as *no change*, never
-as wins, and dropped fixes are reported, never hidden.
+equality. **The planner proposes; the silicon decides.** In-band deltas are reported as *no
+change*, never as wins, and dropped fixes are reported, never hidden.
+
+*(The planner shipping today is a deterministic priority sort. The Claude tool-use loop is
+contract-pinned in `planner/interface.py` and raises `NotImplementedError` rather than
+pretending — the gate, not the planner, is what makes a result trustworthy either way.)*
 
 *(PR rendering is dry-run today: it prints exactly what would ship and makes no network call.
 Posting is [on the roadmap](#-roadmap) and marked in code rather than implied here.)*
@@ -84,7 +88,7 @@ run the replay bundle:
 ```bash
 git clone https://github.com/edycutjong/armsmith && cd armsmith
 python3 -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
-python -m pytest -q                                       # 449 passing, offline
+python -m pytest -q                                       # 455 passing, offline
 armsmith diagnose --replay fixtures/replays/scenario_ragserve   # 4 kept · 2 dropped
 ```
 
@@ -127,7 +131,7 @@ trust the number that was printed at you.
 
 ### What is measured, and what is replayed
 
-**Status: hardware-free core + one live Arm leg.** `449` pytest tests, all green, at **100% line
+**Status: hardware-free core + one live Arm leg.** `455` pytest tests, all green, at **100% line
 coverage**. The rule pack, the planner and the diagnose loop run against **replay bundles**, and a
 bundle is one of two things, always labeled:
 
@@ -246,7 +250,7 @@ disagreement makes the rule refuse to diagnose.
 | Report schema | `jsonschema` (draft 2020-12) | public contract, CI-validated — build your own viewer against it |
 | Live Arm bench | GCC + binutils `objdump` on aarch64 | compile A/B from one source, then count SDOT in the disassembly |
 | CI | GitHub Actions — `ubuntu-24.04-arm` · `ubuntu-22.04-arm` · `ubuntu-latest` × Py 3.11/3.12 | native arm64 legs, free, no hardware to rent |
-| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 449 tests, 100% line coverage |
+| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 455 tests, 100% line coverage |
 
 ## 🏆 Arm Integration (Cloud AI Track)
 
@@ -273,7 +277,7 @@ sudo apt-get update && sudo apt-get install -y python3-venv  # (perf, hyperfine,
 git clone https://github.com/edycutjong/armsmith && cd armsmith
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
-python -m pytest -q                                                    # 449 passing on aarch64
+python -m pytest -q                                                    # 455 passing on aarch64
 armsmith doctor --offline --replay fixtures/replays/scenario_ragserve  # shows dotprod/i8mm/SVE routing
 armsmith diagnose --replay fixtures/replays/scenario_ragserve          # identical loop, native arm64
 armsmith bench-live --require-witness                                  # the real measurement, on your silicon
@@ -326,8 +330,8 @@ armsmith record . --out ./armsmith-bundle
 
 | metric | value |
 |---|---|
-| Tests | **1** passing, **100%** line coverage |
-| CI jobs per push | 8 — incl. **5 native arm64** (4 test legs + 1 live bench) |
+| Tests | **455** passing, **100%** line coverage |
+| CI jobs per push | 10 — incl. **5 native arm64** (4 test legs + 1 live bench, 2 measured ISA extensions) |
 | Rules | 13, each with a citation + positive/negative fixtures |
 | Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
 | ISA witness | `SDOT 0 → 1` in the hot symbol, from real disassembly |
@@ -345,8 +349,8 @@ kernel is a data point, two on different ISA extensions is a harness:
 
 | `--case` | source | flag under test | instruction | how the fast path is reached |
 |---|---|---|---|---|
-| `dot` (default) | [`bench/int8_dot.c`](bench/int8_dot.c) | `+dotprod` | **SDOT** | GCC's vectorizer finds it in plain C |
-| `mmla` | [`bench/int8_mmla.c`](bench/int8_mmla.c) | `+i8mm` | **SMMLA** | ACLE intrinsic behind the feature macro |
+| `dot` (default) | [`int8_dot.c`](src/armsmith/bench/int8_dot.c) | `+dotprod` | **SDOT** | GCC's vectorizer finds it in plain C |
+| `mmla` | [`int8_mmla.c`](src/armsmith/bench/int8_mmla.c) | `+i8mm` | **SMMLA** | ACLE intrinsic behind the feature macro |
 
 The second case is honest about the difference: GCC does *not* reliably auto-vectorize a 2×8·8×2
 int8 matmul into `SMMLA`, so that path uses `vmmlaq_s32` guarded by `__ARM_FEATURE_MATMUL_INT8`,
@@ -441,6 +445,11 @@ so the numbers above are re-derivable by anyone with the repo and an Arm runner 
 
 - Python **3.11** or **3.12**
 - No Arm hardware and no network beyond `pip` — the whole judge surface runs on an x86 laptop
+- **macOS/Darwin:** the static rules (R1/R4/R12), `scan`, `diagnose --replay`, `verify` and
+  `bench-cmd` all work. The probe rules read Linux-only sources (`lscpu`, the THP sysfs node), so
+  `armsmith record` on a Mac writes a valid but **empty** bundle by design — it says so per probe
+  rather than inventing values, and `diagnose` then skips those rules by name. Record on the Linux
+  box you actually want diagnosed.
 - *(optional)* an `aarch64` box + `gcc`/`objdump` if you want to take the live measurement yourself
 
 ### Installation
@@ -468,7 +477,7 @@ This is the primary "runnable by a judge" surface, because most judges have no G
 commands exit 0; the tamper step at the end goes red on purpose.
 
 ```bash
-python -m pytest -q                                            # 449 passing, fully offline
+python -m pytest -q                                            # 455 passing, fully offline
 armsmith scan fixtures/replays/scenario_ragserve               # static R1/R4/R12 on a real dir, zero hardware
 armsmith diagnose --replay fixtures/replays/scenario_ragserve  # full reproduce gate (4 kept, 2 dropped)
 armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt  # ISA proof: 0→4 dotprod
@@ -495,7 +504,7 @@ The replay harness is hardware-free and runs in under a second locally; the live
 ```bash
 .venv/bin/pip install -e '.[dev]'
 
-.venv/bin/python -m pytest -q               # 449 tests, 100% line coverage
+.venv/bin/python -m pytest -q               # 455 tests, 100% line coverage
 .venv/bin/ruff check .                      # lint gate (clean)
 .venv/bin/mypy src                          # types — advisory, not a gate
 .venv/bin/python scripts/verify_offline.py  # scan → gate → sign → verify, end-to-end
@@ -513,7 +522,7 @@ is where the numbers in [Measured on Real Arm Silicon](#measured-on-real-arm-sil
 
 | layer | tool | status |
 |---|---|---|
-| unit + replay suite | pytest (449 tests, 100% cov) | ✅ green, offline |
+| unit + replay suite | pytest (455 tests, 100% cov) | ✅ green, offline |
 | lint | ruff | ✅ gate |
 | types | mypy | ✅ advisory (`continue-on-error`) |
 | end-to-end loop | `verify_offline.py` | ✅ scan → gate → sign → verify |
@@ -539,7 +548,7 @@ bench/int8_dot.c       the live workload — one source, compiled two ways (rule
 schema/                report.schema.json (draft 2020-12, CI-validated)
 fixtures/              hosts/ · rules/rXX_{pos,neg}/ · replays/scenario_ragserve/ · witness/
 scripts/               make_fixtures.py (fixture provenance) · verify_offline.py
-tests/                 449 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
+tests/                 455 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
 site/                  landing page + pitch deck (deployed straight from this repo)
 docs/assets/           brand + hero assets (see ASSETS pipeline)
 docs/migration-templates/  13 x86→Arm migration cards (armsmith rules export)

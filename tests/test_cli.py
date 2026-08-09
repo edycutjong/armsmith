@@ -555,3 +555,52 @@ def test_both_live_cases_are_declared_coherently():
     # the baseline must NOT carry the extension it is meant to lack
     assert "dotprod" not in " ".join(dot.baseline.cflags)
     assert "i8mm" not in " ".join(mmla.baseline.cflags)
+
+
+def test_scan_json_emits_every_match_not_one_exemplar(tmp_path):
+    """A table is for a human; JSON is for a pipeline.
+
+    Truncating to one evidence line there would make a scan look cleaner than
+    the repo actually is.
+    """
+    repo = tmp_path / "svc"
+    (repo / ".github" / "workflows").mkdir(parents=True)
+    (repo / "Dockerfile").write_text("FROM --platform=linux/amd64 python:3.12\n")
+    (repo / "a.py").write_text("import numpy as np\nx = np.zeros(4)\ny = np.ones(8)\n")
+
+    res = runner.invoke(app, ["scan", str(repo), "--json"])
+    assert res.exit_code == 0, res.output
+    payload = json.loads(res.output)
+
+    assert payload["tool"]["name"] == "armsmith"
+    by_id = {r["rule_id"]: r for r in payload["rules"]}
+    assert set(by_id) == {"R1", "R4", "R12"}
+    # BOTH numpy call sites, not just the first
+    assert len(by_id["R4"]["evidence"]) == 2
+    assert by_id["R4"]["fix"]["kind"] == "code_suggestion"
+    assert by_id["R1"]["citation_url"].startswith("https://")
+    assert payload["matched"] == 2
+
+
+def test_scan_json_honours_strict(tmp_path):
+    repo = tmp_path / "svc"
+    repo.mkdir()
+    (repo / "Dockerfile").write_text("FROM --platform=linux/amd64 python:3.12\n")
+    res = runner.invoke(app, ["scan", str(repo), "--json", "--strict"])
+    assert res.exit_code == 1
+    assert json.loads(res.output)["matched"] == 1
+
+
+def test_record_warns_when_it_captures_nothing(tmp_path, monkeypatch):
+    """Silence here would read as 'your host is fine', which is the opposite."""
+    from armsmith import record as rec
+    monkeypatch.setattr(rec, "_capture_numpy_show_config", lambda python=None: (None, "absent"))
+    monkeypatch.setattr(rec, "LiveProbe", lambda: type("P", (), {"has": lambda s, k: False})())
+
+    src = tmp_path / "r"
+    src.mkdir()
+    res = runner.invoke(app, ["record", str(src), "--out", str(tmp_path / "b"), "--no-copy-repo"])
+    assert res.exit_code == 0
+    flat = " ".join(res.output.split())
+    assert "0 probes captured on this host" in flat
+    assert "valid but empty" in flat

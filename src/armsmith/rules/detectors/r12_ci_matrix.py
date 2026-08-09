@@ -59,7 +59,15 @@ def _matrix_values(job: dict, path: str) -> list[str]:
 
     def walk(node, remaining):
         if not remaining:
-            if node is not None and not isinstance(node, (dict, list)):
+            # A terminal LIST is the commonest matrix form —
+            # `matrix: {platform: [linux/amd64, linux/arm64]}` — so its scalars
+            # must be yielded. Recursing without consuming a key here is what
+            # made plain-key matrices resolve to nothing, silently turning an
+            # amd64-only build into a clean result.
+            if isinstance(node, list):
+                for item in node:
+                    walk(item, remaining)
+            elif node is not None and not isinstance(node, dict):
                 found.append(str(node))
             return
         if isinstance(node, list):

@@ -359,3 +359,59 @@ def test_r12_platforms_helper_refuses_to_resolve_without_a_job():
     assert _platforms_of(step) == ("${{ matrix.config.platforms }}", None)
     literal = {"with": {"platforms": "linux/amd64,linux/arm64"}}
     assert _platforms_of(literal)[1] == "linux/amd64,linux/arm64"
+
+
+def test_r4_ignores_a_constructor_whose_dtype_is_pinned_by_astype(tmp_path, specs):
+    """`np.array(x).astype(np.float32)` pins the dtype one call later.
+
+    The constructor's default never survives, so reporting it is a false
+    positive on correct code — found on onnx's backend test models.
+    """
+    repo, probe = _inline_repo(tmp_path, "r4-astype", (
+        "import numpy as np\n"
+        "a = np.array(1.0).astype(np.float32)\n"
+        "b = np.zeros(8).astype(np.float32)\n"
+        "c = np.array(payload).view(np.float32)\n"
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+
+
+def test_r4_still_flags_a_constructor_with_no_cast_on_the_same_line(tmp_path, specs):
+    """The guard must not swallow an unrelated constructor beside a cast."""
+    repo, probe = _inline_repo(tmp_path, "r4-astype-mixed", (
+        "import numpy as np\n"
+        "a = np.array(1.0).astype(np.float32)\n"
+        "b = np.zeros(8)\n"
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+    assert f.status is FindingStatus.MATCHED
+    assert [int(loc.rsplit(":", 1)[1]) for loc in f.locations] == [3]
+
+
+def test_r12_resolves_a_plain_key_matrix_list(tmp_path, specs):
+    """`matrix: {platform: [amd64, arm64]}` is the commonest form.
+
+    It used to resolve to nothing, which silently turned an amd64-only build
+    into a CLEAN result — a false negative, the worse kind of miss.
+    """
+    from armsmith.rules.detectors.r12_ci_matrix import _matrix_values
+
+    job = {"strategy": {"matrix": {"platform": ["linux/amd64", "linux/arm64"]}}}
+    assert _matrix_values(job, "platform") == ["linux/amd64", "linux/arm64"]
+
+    repo, probe = _wf_repo(tmp_path, "r12-plain-noarm", """
+name: docker
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: ["linux/amd64", "linux/386"]
+    steps:
+      - uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ matrix.platform }}
+""")
+    f = run_rule(specs["R12"], repo, probe)
+    assert f.status is FindingStatus.MATCHED      # amd64-only must NOT read clean

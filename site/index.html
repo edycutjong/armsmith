@@ -643,11 +643,15 @@ html.js .reveal.d3{transition-delay:.24s}
 
     <div class="hero-stats h-anim h6" role="list" aria-label="Honest project statistics">
       <div class="hstat" role="listitem">
-        <div class="n mono">&minus;86.5<span class="dim">%</span></div>
-        <div class="l">measured on Neoverse&#8209;N2 · <code class="mono">SDOT 0 → 1</code></div>
+        <div class="n mono">&minus;86.4<span class="dim">%</span></div>
+        <div class="l">measured on Neoverse&#8209;N2 · <code class="mono">SDOT 0 → 1</code> (+dotprod)</div>
       </div>
       <div class="hstat" role="listitem">
-        <div class="n mono">449</div>
+        <div class="n mono">&minus;71.9<span class="dim">%</span></div>
+        <div class="l">second case · <code class="mono">SMMLA 0 → 1</code> (+i8mm) — two instructions, two ISA extensions</div>
+      </div>
+      <div class="hstat" role="listitem">
+        <div class="n mono">455</div>
         <div class="l">tests passing · fully offline</div>
       </div>
       <div class="hstat" role="listitem">
@@ -685,7 +689,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
   <span class="k">VERIFY OK</span> — every statistic recomputed from the embedded raw samples</pre>
       </div>
-      <figcaption class="hero-term-cap">Real gate behavior, provable offline. Replay data is synthetic and labeled at every layer — and the same path now carries a <b>live measurement on real Arm silicon</b>: <code class="mono">SDOT 0 → 1</code>, <b>&minus;86.5%</b> kernel time on a Neoverse-N2 runner.</figcaption>
+      <figcaption class="hero-term-cap">Real gate behavior, provable offline. Replay data is synthetic and labeled at every layer — and the same path now carries <b>two live measurements on real Arm silicon</b>: <code class="mono">SDOT 0 → 1</code> (&minus;86.4%, +dotprod) and <code class="mono">SMMLA 0 → 1</code> (&minus;71.9%, +i8mm). The last digits move between runs because the job re-measures on every push — a number that never drifted would be a number nobody was measuring.</figcaption>
     </figure>
   </div>
 </section>
@@ -999,7 +1003,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="cmd">python3 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="cmd">pip install -e '.[dev]'</span>
 
-<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 449 passing, fully offline</span>
+<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 455 passing, fully offline</span>
 <span class="cmd">armsmith scan fixtures/replays/scenario_ragserve</span>               <span class="c"># static R1/R4/R12 — zero hardware</span>
 <span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>  <span class="c"># full gate: 4 kept, 2 dropped</span>
 <span class="cmd">armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt</span>  <span class="c"># ISA proof: 0 → 4 dotprod</span>
@@ -1051,7 +1055,7 @@ html.js .reveal.d3{transition-delay:.24s}
       <details>
         <summary><span class="qno mono">Q1</span>Do I need Arm hardware to validate any of this?</summary>
         <div class="a"><p>No. The judge quickstart runs on any x86 laptop in about two minutes, fully offline
-        beyond <code>pip</code>: 449 tests, the static scan, the full replay reproduce gate, the ISA witness,
+        beyond <code>pip</code>: 455 tests, the static scan, the full replay reproduce gate, the ISA witness,
         <code>verify</code>, and the CI twin — all exit 0 with no Arm box and no network.</p></div>
       </details>
       <details>
@@ -1144,7 +1148,7 @@ html.js .reveal.d3{transition-delay:.24s}
         <h3>Fine print</h3>
         <ul>
           <li><span class="dim">MIT license · submitted on Devpost as <b>Armsmith</b></span></li>
-          <li><span class="dim">449 tests · fully offline · 100% line coverage</span></li>
+          <li><span class="dim">455 tests · fully offline · 100% line coverage</span></li>
           <li><span class="dim">Live Arm leg measured on Neoverse&#8209;N2 · no throughput multiplier extrapolated to your model</span></li>
           <li><span class="dim">Replay data is synthetic and labeled at every layer</span></li>
         </ul>

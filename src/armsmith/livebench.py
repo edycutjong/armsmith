@@ -250,7 +250,12 @@ def detect_toolchain(require_arm: bool = True) -> Toolchain:
 def kernel_source(filename: str = "int8_dot.c") -> Path:
     """Absolute path to a bench/ kernel source, wherever the package lives."""
     # src/armsmith/livebench.py -> src/armsmith -> src -> repo root
+    # The packaged copy is checked first and is the canonical one. It lives
+    # inside the package precisely so it ships in a wheel: data outside the
+    # package directory never reaches one, and `pip install armsmith` followed
+    # by `bench-live` used to fail with "not found" for exactly that reason.
     candidates = [
+        Path(__file__).resolve().parent / "bench" / filename,
         Path(__file__).resolve().parents[2] / "bench" / filename,
         Path.cwd() / "bench" / filename,
     ]
