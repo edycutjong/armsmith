@@ -6,7 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "armsmith"
 version = "1.2.0"
 description = "CLI agent that profiles AI repos on Arm, diagnoses aarch64 slowness with a 13-rule pack, and drafts PRs whose fixes passed a reproduce-benchmark gate."
-readme = "README.md"
+# NOT README.md: that one's hero/icon are relative SVG paths, which PyPI
+# resolves against pypi.org and 404s (and GitHub raw serves .svg as
+# text/plain, so an <img> would not render it even absolute). It also carries
+# 17 repo-relative links. README-pypi.md is the same project described with
+# absolute https URLs only.
+readme = "README-pypi.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Edy Cu" }]
