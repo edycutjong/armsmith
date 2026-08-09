@@ -24,7 +24,7 @@
 
   [![CI](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml/badge.svg)](https://github.com/edycutjong/armsmith/actions/workflows/ci.yml)
   [![Release](https://img.shields.io/github/v/release/edycutjong/armsmith?sort=semver&logo=semanticrelease&logoColor=white&color=2EE6A6)](https://github.com/edycutjong/armsmith/releases)
-  ![384 tests passing](https://img.shields.io/badge/tests-384%20passing-brightgreen)
+  ![386 tests passing](https://img.shields.io/badge/tests-386%20passing-brightgreen)
   ![coverage 100%](https://img.shields.io/badge/coverage-100%25-brightgreen)
   ![Python 3.11 | 3.12](https://img.shields.io/badge/Python-3.11%20%7C%203.12-3776AB?style=flat&logo=python&logoColor=white)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](https://opensource.org/licenses/MIT)
@@ -49,7 +49,7 @@
   [![Vercel](https://img.shields.io/badge/Vercel-site-000000?logo=vercel&logoColor=white)](https://vercel.com/)
 
   <sub><b>Quality gates</b></sub><br/>
-  [![pytest](https://img.shields.io/badge/pytest-384%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+  [![pytest](https://img.shields.io/badge/pytest-386%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
   [![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
   [![mypy](https://img.shields.io/badge/mypy-typed-1F5082)](https://mypy-lang.org/)
   [![CodeQL](https://img.shields.io/badge/CodeQL-0%20alerts-2088FF?logo=github&logoColor=white)](https://github.com/edycutjong/armsmith/security/code-scanning)
@@ -61,12 +61,13 @@
 ---
 
 Armsmith profiles an AI repo on Arm, diagnoses *why*
-it is slow on aarch64 with a 13-rule anti-pattern pack, drafts fixes, and opens a PR in which
+it is slow on aarch64 with a 13-rule anti-pattern pack, drafts fixes, and renders a PR in which
 **every fix has passed a reproduce-benchmark gate** — median-of-N, MAD noise bands, output-hash
-equality. The LLM plans; the silicon decides. In-band deltas are reported as *no change*, never as
+equality. (PR rendering is dry-run today — it prints exactly what would ship and makes no network
+call. Posting is [on the roadmap](#-roadmap), marked in code rather than implied here.) The LLM plans; the silicon decides. In-band deltas are reported as *no change*, never as
 wins, and dropped fixes are reported, never hidden.
 
-**Status: hardware-free core + one live Arm leg.** `384` pytest tests, all green, at **100% line coverage**. The rule pack, the
+**Status: hardware-free core + one live Arm leg.** `386` pytest tests, all green, at **100% line coverage**. The rule pack, the
 planner and the diagnose loop run against **replay bundles** — recorded/synthetic instrument outputs
 labeled `"synthetic": true` at every layer and refused by every loader when unlabeled. Exactly one
 path produces real hardware numbers, `armsmith bench-live` ([see below](#measured-on-real-arm-silicon)),
@@ -132,6 +133,30 @@ the gate.
 | R12 | CI publishes amd64-only images | static (workflow YAML) |
 | R13 | serving overhead dominates kernel time | probe (llama-bench × hyperfine) |
 
+#### Precision on a repo we've never seen
+
+A linter that cries wolf gets uninstalled, so R4 is measured against a real target rather than its
+own fixtures. Pointed at a fresh clone of
+[huggingface/text-generation-inference](https://github.com/huggingface/text-generation-inference):
+
+| | flagged | false positives |
+|---|---|---|
+| naive "no `dtype=` → float64" | 5 | **4** |
+| shipped R4 | **1** | 0 proven wrong |
+
+The four that vanished were integer permutation arrays in the Marlin GPTQ path
+(`layers/marlin/gptq.py:461,463`, `layers/marlin/util.py:134,136`). numpy infers dtype from the
+data — `np.array([0, 2, 4])` is **int64**, and `np.full(n, 0)` is int64 too — so those were never
+float64, and the fix R4 would have proposed (pin `dtype=np.float32`) would have silently turned an
+index array into floats. R4 now reasons per constructor: `zeros`/`ones`/`empty`/`linspace` are
+float64 whatever you pass them and are always reported; `array`/`full` are reported only when the
+payload isn't a provable integer literal.
+
+The one surviving hit, `utils/segments.py:17`, is `np.array(adapter_indices)` — a *non-literal*
+argument. Armsmith cannot prove that one statically, so it reports it: under-reporting a real
+float64 coercion on an inference path costs more than one honest question. That is the deliberate
+bias, and `test_r4_does_not_flag_an_integer_permutation_array` pins the regression.
+
 R13 is the two-instrument triangulation rule: llama-bench timings exclude tokenization + sampling,
 so Armsmith reconstructs kernel time from llama-bench samples and compares it with hyperfine
 end-to-end wall time — >15% divergence means the pipeline, not the kernels, is the bottleneck.
@@ -149,7 +174,7 @@ disagreement makes the rule refuse to diagnose.
 | Report schema | `jsonschema` (draft 2020-12) | public contract, CI-validated — build your own viewer against it |
 | Live Arm bench | GCC + binutils `objdump` on aarch64 | compile A/B from one source, then count SDOT in the disassembly |
 | CI | GitHub Actions — `ubuntu-24.04-arm` · `ubuntu-22.04-arm` · `ubuntu-latest` × Py 3.11/3.12 | native arm64 legs, free, no hardware to rent |
-| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 384 tests, 100% line coverage |
+| Quality | pytest + pytest-cov · ruff · mypy · CodeQL · TruffleHog | 386 tests, 100% line coverage |
 
 ## 🏆 Arm Integration (Cloud AI Track)
 
@@ -176,7 +201,7 @@ sudo apt-get update && sudo apt-get install -y python3-venv  # (perf, hyperfine,
 git clone https://github.com/edycutjong/armsmith && cd armsmith
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
-python -m pytest -q                                                    # 384 passing on aarch64
+python -m pytest -q                                                    # 386 passing on aarch64
 armsmith doctor --offline --replay fixtures/replays/scenario_ragserve  # shows dotprod/i8mm/SVE routing
 armsmith diagnose --replay fixtures/replays/scenario_ragserve          # identical loop, native arm64
 armsmith bench-live --require-witness                                  # the real measurement, on your silicon
@@ -206,7 +231,7 @@ jobs:
 
 | metric | value |
 |---|---|
-| Tests | **384** passing, **100%** line coverage |
+| Tests | **386** passing, **100%** line coverage |
 | CI jobs per push | 8 — incl. **5 native arm64** (4 test legs + 1 live bench) |
 | Rules | 13, each with a citation + positive/negative fixtures |
 | Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
@@ -313,7 +338,7 @@ This is the primary "runnable by a judge" surface, because most judges have no G
 commands exit 0; the tamper step at the end goes red on purpose.
 
 ```bash
-python -m pytest -q                                            # 384 passing, fully offline
+python -m pytest -q                                            # 386 passing, fully offline
 armsmith scan fixtures/replays/scenario_ragserve               # static R1/R4/R12 on a real dir, zero hardware
 armsmith diagnose --replay fixtures/replays/scenario_ragserve  # full reproduce gate (4 kept, 2 dropped)
 armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt  # ISA proof: 0→4 dotprod
@@ -340,7 +365,7 @@ The replay harness is hardware-free and runs in under a second locally; the live
 ```bash
 .venv/bin/pip install -e '.[dev]'
 
-.venv/bin/python -m pytest -q               # 384 tests, 100% line coverage
+.venv/bin/python -m pytest -q               # 386 tests, 100% line coverage
 .venv/bin/ruff check .                      # lint gate (clean)
 .venv/bin/mypy src                          # types — advisory, not a gate
 .venv/bin/python scripts/verify_offline.py  # scan → gate → sign → verify, end-to-end
@@ -358,7 +383,7 @@ is where the numbers in [Measured on Real Arm Silicon](#measured-on-real-arm-sil
 
 | layer | tool | status |
 |---|---|---|
-| unit + replay suite | pytest (384 tests, 100% cov) | ✅ green, offline |
+| unit + replay suite | pytest (386 tests, 100% cov) | ✅ green, offline |
 | lint | ruff | ✅ gate |
 | types | mypy | ✅ advisory (`continue-on-error`) |
 | end-to-end loop | `verify_offline.py` | ✅ scan → gate → sign → verify |
@@ -384,7 +409,7 @@ bench/int8_dot.c       the live workload — one source, compiled two ways (rule
 schema/                report.schema.json (draft 2020-12, CI-validated)
 fixtures/              hosts/ · rules/rXX_{pos,neg}/ · replays/scenario_ragserve/ · witness/
 scripts/               make_fixtures.py (fixture provenance) · verify_offline.py
-tests/                 384 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
+tests/                 386 tests (goldens, pos/neg per rule, gate, signing, CLI, e2e, live bench)
 site/                  landing page + pitch deck (deployed straight from this repo)
 docs/assets/           brand + hero assets (see ASSETS pipeline)
 docs/migration-templates/  13 x86→Arm migration cards (armsmith rules export)

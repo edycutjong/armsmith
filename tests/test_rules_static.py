@@ -74,6 +74,61 @@ def test_r4_handles_from_import_alias(tmp_path, specs):
     assert len(f.locations) == 2  # arr(...) and numpy.linspace(...); full() has dtype
 
 
+def _inline_repo(tmp_path, scenario, source):
+    import json
+    (tmp_path / "manifest.json").write_text(json.dumps(
+        {"synthetic": True, "provenance": "inline test fixture", "scenario": scenario}))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "m.py").write_text(source)
+    return repo, ReplayProbe(tmp_path)
+
+
+def test_r4_respects_numpy_dtype_inference(tmp_path, specs):
+    """A missing dtype= is only float64 when numpy would actually infer float64.
+
+    Every expectation below was checked against real numpy: np.array([0, 2, 4])
+    is int64, np.full(n, 0) is int64, np.array([True, False]) is bool, and
+    np.zeros/linspace are float64 no matter what. Flagging the integer forms
+    was a false positive whose suggested patch (pin dtype=np.float32) would
+    silently corrupt an index array.
+    """
+    repo, probe = _inline_repo(tmp_path, "r4-dtype-inference", "\n".join([
+        "import numpy as np",                     # 1
+        "",                                       # 2
+        "idx = np.array([0, 2, 4])",              # 3  int64      -> clean
+        "grid = np.array([[1, 2], [3, 4]])",      # 4  int64      -> clean
+        "signed = np.array([-1, 2])",             # 5  int64      -> clean
+        "mask = np.array([True, False])",         # 6  bool       -> clean
+        "fill_i = np.full((2, 2), 0)",            # 7  int64      -> clean
+        "mixed = np.array([1.0, 2])",             # 8  float64    -> FLAG
+        "fill_f = np.full((2, 2), 0.5)",          # 9  float64    -> FLAG
+        "unknown = np.array(payload)",            # 10 unprovable -> FLAG
+        "buf = np.zeros(8)",                      # 11 float64    -> FLAG
+    ]) + "\n")
+    f = run_rule(specs["R4"], repo, probe)
+
+    assert f.status is FindingStatus.MATCHED
+    flagged = sorted(int(loc.rsplit(":", 1)[1]) for loc in f.locations)
+    assert flagged == [8, 9, 10, 11]
+
+
+def test_r4_does_not_flag_an_integer_permutation_array(tmp_path, specs):
+    """Regression: the shape that produced 5/5 false positives on a real repo.
+
+    huggingface/text-generation-inference builds integer permutation arrays for
+    GPTQ weight shuffling. R4 flagged every one and proposed dtype=np.float32,
+    which would have turned an index into a float and broken the indexing.
+    """
+    repo, probe = _inline_repo(tmp_path, "r4-permutation", (
+        "import numpy\n"
+        "g_idx = numpy.argsort(numpy.array([0, 2, 4, 6, 1, 3, 5, 7]))\n"
+    ))
+    f = run_rule(specs["R4"], repo, probe)
+    assert f.status is FindingStatus.CLEAN
+    assert f.fix is None
+
+
 def test_r4_ignores_non_numpy_calls(tmp_path, specs):
     import json
     (tmp_path / "manifest.json").write_text(json.dumps(

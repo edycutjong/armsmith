@@ -57,7 +57,7 @@ jobs:
       - name: Types (mypy — advisory)
         run: .venv/bin/mypy src
         continue-on-error: true
-      - name: Unit + replay suite (384 tests, 100% line coverage) with coverage
+      - name: Unit + replay suite (386 tests, 100% line coverage) with coverage
         run: .venv/bin/python -m pytest -q --cov=armsmith --cov-report=xml --cov-report=term-missing
       - name: Offline end-to-end (scan → gate → sign → verify)
         run: .venv/bin/python scripts/verify_offline.py
@@ -181,7 +181,7 @@ jobs:
             echo ""
             echo "| stage | what it proved |"
             echo "|---|---|"
-            echo "| 1 · Quality | ruff + mypy + 384 tests at 100% line coverage, on 6 legs (4 native arm64) |"
+            echo "| 1 · Quality | ruff + mypy + 386 tests at 100% line coverage, on 6 legs (4 native arm64) |"
             echo "| 2 · Security | TruffleHog verified-secret scan over full git history · pip-audit |"
             echo "| 3 · Build | wheel installs clean and still finds its rule packs + schema |"
             echo "| 4 · E2E | offline scan → gate → sign → verify, plus the \`armsmith ci\` twin |"

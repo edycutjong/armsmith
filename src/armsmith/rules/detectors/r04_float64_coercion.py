@@ -4,6 +4,13 @@ Walks every ``*.py`` file's AST looking for numpy array-constructor calls
 without an explicit ``dtype=`` keyword: ``np.array/zeros/ones/empty/full/
 linspace``.  Handles ``import numpy``, ``import numpy as np`` and
 ``from numpy import array as arr`` alias forms.
+
+A missing ``dtype=`` is only reported where float64 is actually the outcome.
+numpy infers dtype from the data, so ``np.array([0, 2, 4])`` is int64 and
+``np.full(n, 0)`` is int64 — reporting those would be a false positive, and
+the patch this rule suggests (pin ``dtype=np.float32``) would silently corrupt
+an integer index array. ``zeros``/``ones``/``empty``/``linspace`` return
+float64 regardless of their arguments and are always reported.
 """
 
 from __future__ import annotations
@@ -15,6 +22,48 @@ from ..base import Finding, FindingStatus, Fix, RuleSpec, clean, register
 
 #: numpy constructors whose default dtype is float64 for float input.
 _CTORS = {"array", "zeros", "ones", "empty", "full", "linspace"}
+
+#: Constructors that return float64 by default no matter what you pass them:
+#: ``np.zeros(3)`` is float64, and so is ``np.linspace(0, 1)``. For these,
+#: a missing ``dtype=`` is always worth flagging.
+_ALWAYS_FLOAT64 = {"zeros", "ones", "empty", "linspace"}
+
+
+def _is_integer_literal(node: ast.AST) -> bool:
+    """True if ``node`` is an int/bool literal, or a list/tuple literal of them.
+
+    numpy infers dtype from the data: ``np.array([0, 2, 4])`` is **int64**, not
+    float64, and ``np.full(n, 0)`` is int64 too. Flagging those as "silent
+    float64 coercion" is simply wrong, and the suggested fix — pinning
+    ``dtype=np.float32`` — would corrupt an integer index or permutation array.
+    Recurses so nested literals like ``[[1, 2], [3, 4]]`` are recognised, and
+    accepts unary +/- so ``[-1, 2]`` still counts.
+    """
+    if isinstance(node, ast.Constant):
+        # bool is a subclass of int; neither yields float64.
+        return isinstance(node.value, int)
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return bool(node.elts) and all(_is_integer_literal(e) for e in node.elts)
+    if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+        return _is_integer_literal(node.operand)
+    return False
+
+
+def _yields_float64(ctor: str, call: ast.Call) -> bool:
+    """Whether this call actually risks a float64 result without ``dtype=``.
+
+    Anything we cannot prove is integer stays flagged: a non-literal argument
+    (``np.array(x)``) is unknown, and under-reporting a real float64 coercion
+    is the more expensive mistake on an Arm inference path.
+    """
+    if ctor in _ALWAYS_FLOAT64:
+        return True
+    if ctor == "array":
+        # dtype is inferred from the payload: np.array([0, 2, 4]) is int64.
+        return not (call.args and _is_integer_literal(call.args[0]))
+    # ``full`` is the only constructor left in _CTORS, and its dtype follows the
+    # fill value: np.full(n, 0) is int64, np.full(n, 0.5) is float64.
+    return not (len(call.args) >= 2 and _is_integer_literal(call.args[1]))
 
 
 class _NumpyAliasVisitor(ast.NodeVisitor):
@@ -36,21 +85,27 @@ class _NumpyAliasVisitor(ast.NodeVisitor):
                     self.func_aliases[alias.asname or alias.name] = alias.name
         self.generic_visit(node)
 
-    def _ctor_name(self, call: ast.Call) -> str | None:
+    def _ctor_name(self, call: ast.Call) -> tuple[str, str] | None:
+        """Return ``(display_name, canonical_ctor)``, or None if not a numpy ctor.
+
+        The two differ under ``from numpy import array as arr``: the message
+        should say ``arr(...)`` but the dtype reasoning needs ``array``.
+        """
         fn = call.func
         if isinstance(fn, ast.Attribute) and isinstance(fn.value, ast.Name):
             if fn.value.id in self.module_aliases and fn.attr in _CTORS:
-                return f"{fn.value.id}.{fn.attr}"
+                return f"{fn.value.id}.{fn.attr}", fn.attr
         if isinstance(fn, ast.Name) and fn.id in self.func_aliases:
-            return fn.id
+            return fn.id, self.func_aliases[fn.id]
         return None
 
     def visit_Call(self, node: ast.Call) -> None:
-        name = self._ctor_name(node)
-        if name is not None:
+        found = self._ctor_name(node)
+        if found is not None:
+            display, ctor = found
             has_dtype = any(kw.arg == "dtype" for kw in node.keywords)
-            if not has_dtype:
-                self.hits.append((node.lineno, node.col_offset, name))
+            if not has_dtype and _yields_float64(ctor, node):
+                self.hits.append((node.lineno, node.col_offset, display))
         self.generic_visit(node)
 
 
