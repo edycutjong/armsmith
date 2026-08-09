@@ -1,6 +1,88 @@
 # CHANGELOG
 
 
+## v1.0.3 (2026-08-09)
+
+### Bug Fixes
+
+- **rules**: Stop R4 flagging integer arrays as float64 coercion
+  ([`fbeccf2`](https://github.com/edycutjong/armsmith/commit/fbeccf2cca47de98071dea3c91f71bbbce0ef568))
+
+R4 flagged any numpy constructor call missing dtype=, with no type inference at all. On a fresh
+  clone of huggingface/text-generation-inference that produced 5 findings, 4 of them false — integer
+  permutation arrays in the Marlin GPTQ path (gptq.py:461,463, util.py:134,136). Worse than noise:
+  the fix it proposed was 'add dtype=np.float32', which applied to
+  numpy.argsort(numpy.array([0,2,4,6,1,3,5,7])) would silently turn an index array into floats.
+
+numpy infers dtype from the data. Verified against real numpy: np.array([0, 2, 4]) -> int64
+  np.zeros(3) -> float64 np.array([[1,2],[3,4]]) -> int64 np.ones(3) -> float64 np.array([True,
+  False]) -> bool np.empty(3) -> float64 np.array([1.0, 2]) -> float64 np.linspace(0,1)-> float64
+  np.full(3, 0) -> int64 np.full(3, 0.5) -> float64
+
+So R4 now reasons per constructor: zeros/ones/empty/linspace are float64 whatever you pass them and
+  are always reported; array/full are reported only when the payload is not a provable integer
+  literal (recursing through nested lists and unary +/-).
+
+Anything unprovable stays flagged — np.array(x) with a non-literal argument is still reported,
+  because under-reporting a real float64 coercion on an inference path costs more than one honest
+  question. On TGI that leaves exactly one hit, segments.py:17, which is that conservative case.
+
+TGI: 5 findings / 4 false -> 1 finding / 0 proven wrong. Documented in the README as a precision
+  demo on a repo we have never seen, and pinned by
+  test_r4_does_not_flag_an_integer_permutation_array. 386 tests, 100% cov.
+
+Also aligns the README intro with the roadmap: PR rendering is dry-run and now says so in the first
+  paragraph, not only 350 lines later.
+
+### Continuous Integration
+
+- **release**: Keep v1 floating, wire PyPI trusted publishing
+  ([`61c5f5e`](https://github.com/edycutjong/armsmith/commit/61c5f5e5989df912326c727f9370d303fba07cd8))
+
+Two adoption blockers, both packaging rather than code.
+
+v1 never existed. README and action.yml both document 'uses: edycutjong/armsmith@v1', but only
+  v1.0.0/v1.0.1/v1.0.2 were ever tagged, so github.com/edycutjong/armsmith/tree/v1 404s and a
+  stranger copy-pasting the CI snippet gets 'Unable to resolve action'. The release job now
+  force-moves v1 onto each new 1.x release, so the documented reference resolves and tracks the
+  latest patch.
+
+Nothing was installable. build_command was empty by design ('nothing is published to an index'), so
+  adoption meant git clone + pip install -e. Now the release builds sdist+wheel and a publish job
+  ships them to PyPI via Trusted Publishing — OIDC, no API token stored in the repo.
+
+The publish job is gated on the PUBLISH_TO_PYPI repo variable and stays inert until the PyPI-side
+  trusted publisher exists: a missing publisher would fail the run and paint the release red for
+  what is purely account setup. Setup steps are in the job comment. The name 'armsmith' is free on
+  PyPI (checked).
+
+The README still says clone-and-install, and will keep saying it until a release actually lands on
+  PyPI — advertising an install command that does not work yet is the exact kind of claim this
+  project refuses to make.
+
+Also drops 'opens PRs' from the package description, which is the text PyPI and GitHub both display;
+  rendering is dry-run today.
+
+### Documentation
+
+- **readme**: Lift the fold — quickstart above, hedges below
+  ([`12a32a8`](https://github.com/edycutjong/armsmith/commit/12a32a81a676a2622fc5d39ff8b00c658b97623e))
+
+Getting Started sat at line ~294 of 444. A developer who wanted to run the thing scrolled past ~30
+  badges, the problem statement, the architecture, the rigor tables and an honesty caveat before
+  reaching a command.
+
+- The four-line quickstart now sits directly under the badges, with the outputs it actually produces
+  (386 passing, 4 kept / 2 dropped — both verified just now), plus pointers to make all and
+  CONTRIBUTING, which the front door never mentioned. - python3, not python: macOS ships no bare
+  'python', so the documented venv line failed on the first machine a judge is likely to use. -
+  'Built with' and 'Quality gates' badge rows move down into Engineering Rigor, where they are
+  evidence rather than an obstacle. Top matter keeps the CTA row, build status, and the Arm platform
+  row. - The Status caveat moves below the Solution as 'What is measured, and what is replayed'. It
+  is the right disclosure and the wrong first impression; the thesis line — the LLM plans, the
+  silicon decides — now lands immediately after the pitch instead of behind a hedge.
+
+
 ## v1.0.2 (2026-08-09)
 
 ### Bug Fixes
