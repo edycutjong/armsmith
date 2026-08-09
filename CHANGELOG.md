@@ -1,6 +1,52 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-08-09)
+
+### Bug Fixes
+
+- **packaging**: Give PyPI its own README so the page actually renders
+  ([`3c7af38`](https://github.com/edycutjong/armsmith/commit/3c7af383ff6b288c0e1093553e56a39d71b59e74))
+
+The PyPI page showed broken images. Three reasons, all structural:
+
+- README.md's hero and icon are relative paths (docs/*.svg). PyPI renders long_description
+  standalone, so those resolve against pypi.org and 404. - They are SVG, and GitHub raw serves .svg
+  as text/plain — an <img> would not render them even with an absolute URL. - The file carries 17
+  repo-relative links (action.yml, LICENSE, .github/*, #anchors) that only resolve inside the repo.
+
+README-pypi.md is the same project described with absolute https URLs only, and leads with install
+  rather than hackathon framing. Its hero is the PNG the live site already serves — correct
+  Content-Type, already deployed, zero new bytes in the repo.
+
+Verified through readme_renderer (the renderer PyPI itself uses): 7 images survive sanitisation, all
+  absolute https, no relative srcs; twine check passes on both wheel and sdist, and the sdist
+  carries the file.
+
+GitHub's README.md is unchanged — it keeps the animated SVG hero, which renders fine there.
+
+### Documentation
+
+- **site**: Audit landing + deck against what actually shipped
+  ([`079c9c1`](https://github.com/edycutjong/armsmith/commit/079c9c14de475be726195c61873b0b88919f1681))
+
+Both surfaces predated today's work and were quietly wrong in four ways.
+
+- armsmith record appeared NOWHERE on either page, despite being the change that lets the probe
+  rules run on a stranger's repo at all. The landing quickstart now shows record -> diagnose, and a
+  new artifact card explains the manifest declares synthetic:false. - The deck counted 7 commands.
+  There are 8. - Neither page linked PyPI or GitHub Releases. Added to the landing footer, the hero
+  CTA row, and the deck's link slide; the deck numgrid gains a uvx tile. - The migration-template
+  card still described the cards as anti-pattern + fix + citation. They now carry a paste-able
+  before->after diff on 11 of 13, and the card says which two do not and why.
+
+Also corrects 'add a 14th rule with zero core changes' to the truth: one YAML, one detector, one
+  import.
+
+Checked with a headless render of both pages: 0 console errors, 0 empty hrefs, no horizontal
+  overflow.
+
+
 ## v1.2.0 (2026-08-09)
 
 ### Continuous Integration
