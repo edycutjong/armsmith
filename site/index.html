@@ -643,7 +643,11 @@ html.js .reveal.d3{transition-delay:.24s}
 
     <div class="hero-stats h-anim h6" role="list" aria-label="Honest project statistics">
       <div class="hstat" role="listitem">
-        <div class="n mono">219</div>
+        <div class="n mono">&minus;86.5<span class="dim">%</span></div>
+        <div class="l">measured on Neoverse&#8209;N2 · <code class="mono">SDOT 0 → 1</code></div>
+      </div>
+      <div class="hstat" role="listitem">
+        <div class="n mono">384</div>
         <div class="l">tests passing · fully offline</div>
       </div>
       <div class="hstat" role="listitem">
@@ -681,7 +685,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="p">$</span> <span class="cmd">armsmith verify fixtures/replays/scenario_ragserve/report.json</span>
   <span class="k">VERIFY OK</span> — every statistic recomputed from the embedded raw samples</pre>
       </div>
-      <figcaption class="hero-term-cap">Real gate behavior, provable offline. Replay data is synthetic and labeled at every layer — the live Graviton multiplier stays <b>[PENDING]</b> until real hardware measures it.</figcaption>
+      <figcaption class="hero-term-cap">Real gate behavior, provable offline. Replay data is synthetic and labeled at every layer — and the same path now carries a <b>live measurement on real Arm silicon</b>: <code class="mono">SDOT 0 → 1</code>, <b>&minus;86.5%</b> kernel time on a Neoverse-N2 runner.</figcaption>
     </figure>
   </div>
 </section>
@@ -886,7 +890,7 @@ html.js .reveal.d3{transition-delay:.24s}
     <div class="refuse-card reveal">
       <h3>What we <span>refuse to claim</span> (yet)</h3>
       <ul class="refuse-list">
-        <li><span class="m" aria-hidden="true">○</span><span>Live Graviton throughput multiplier — <b>not yet measured</b>. It ships when real hardware measures it, and not one second before.<span class="tag">[PENDING]</span></span></li>
+        <li><span class="m" aria-hidden="true">●</span><span>A throughput multiplier for <b>your</b> model — <b>not claimed</b>. What is measured is one int8 microkernel on a Neoverse-N2 runner (<code class="mono">SDOT 0 → 1</code>, &minus;86.5%); it proves the gate works on real silicon, not that your workload gets faster. The honest number is the one you run on your own hardware.<span class="tag">measured ≠ extrapolated</span></span></li>
         <li><span class="m" aria-hidden="true">●</span><span>All replay data is <b>synthetic</b> — labeled <code class="mono">"synthetic": true</code> at every layer; every loader refuses unlabeled measurement data.<span class="tag">by design</span></span></li>
         <li><span class="m" aria-hidden="true">○</span><span>Live perf/PMU capture · llama-bench · PR posting · the Claude planner loop — deferred, marked in code, exit non-zero instead of faking output.<span class="tag">TODO(S1)</span></span></li>
       </ul>
@@ -976,7 +980,7 @@ html.js .reveal.d3{transition-delay:.24s}
 <span class="cmd">python -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="cmd">pip install -e '.[dev]'</span>
 
-<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 219 passing, fully offline</span>
+<span class="cmd">python -m pytest -q</span>                                             <span class="c"># 384 passing, fully offline</span>
 <span class="cmd">armsmith scan fixtures/replays/scenario_ragserve</span>               <span class="c"># static R1/R4/R12 — zero hardware</span>
 <span class="cmd">armsmith diagnose --replay fixtures/replays/scenario_ragserve</span>  <span class="c"># full gate: 4 kept, 2 dropped</span>
 <span class="cmd">armsmith witness fixtures/witness/objdump_before.txt fixtures/witness/objdump_after.txt</span>  <span class="c"># ISA proof: 0 → 4 dotprod</span>
@@ -1028,16 +1032,21 @@ html.js .reveal.d3{transition-delay:.24s}
       <details>
         <summary><span class="qno mono">Q1</span>Do I need Arm hardware to validate any of this?</summary>
         <div class="a"><p>No. The judge quickstart runs on any x86 laptop in about two minutes, fully offline
-        beyond <code>pip</code>: 219 tests, the static scan, the full replay reproduce gate, the ISA witness,
+        beyond <code>pip</code>: 384 tests, the static scan, the full replay reproduce gate, the ISA witness,
         <code>verify</code>, and the CI twin — all exit 0 with no Arm box and no network.</p></div>
       </details>
       <details>
         <summary><span class="qno mono">Q2</span>Are the performance numbers real hardware measurements?</summary>
-        <div class="a"><p>No — and the tool is built so that can&rsquo;t be fudged. Every number in the repo today
-        comes from replay bundles labeled <code>"synthetic": true</code> at every layer; loaders refuse unlabeled
-        measurement data. The live Graviton multiplier is <b>[PENDING]</b> until a real capture lands. What
-        <em>is</em> real today: the gate math, the drop behavior, the signatures, and the
-        <code>0 → 4</code> dotprod ISA witness — all deterministic and re-runnable.</p></div>
+        <div class="a"><p><b>One leg is, and it is the one that matters.</b> On every push, a GitHub-hosted
+        <code>ubuntu-24.04-arm</code> runner (host <b>Neoverse-N2</b>, <code>gcc 13.3.0</code>) compiles the same
+        int8 dot-product kernel twice — differing only in <code>-march</code> — disassembles both, and measures them:
+        <code>SDOT 0 → 1</code>, median <code>0.059975 s → 0.008123 s</code>, <b>&minus;86.5% (7.4×)</b>, outside a
+        ±0.000144 s noise band, output hashes identical, gate verdict <code>keep</code>. The report is signed and
+        every statistic is re-derived from the embedded raw samples.</p>
+        <p>The <em>rest</em> of the numbers come from replay bundles labeled <code>"synthetic": true</code> at every
+        layer, and the loaders refuse unlabeled measurement data — so the two can never be confused for one another.
+        Armsmith also refuses to run <code>bench-live</code> on a non-<code>aarch64</code> host rather than
+        manufacture a result.</p></div>
       </details>
       <details>
         <summary><span class="qno mono">Q3</span>What happens to a fix that can&rsquo;t be proven?</summary>
@@ -1113,8 +1122,8 @@ html.js .reveal.d3{transition-delay:.24s}
         <h3>Fine print</h3>
         <ul>
           <li><span class="dim">MIT license · submitted on Devpost as <b>Armsmith</b></span></li>
-          <li><span class="dim">219 tests · fully offline · ~93% line coverage</span></li>
-          <li><span class="dim">No hardware throughput claimed — live Graviton numbers are <code>[PENDING]</code></span></li>
+          <li><span class="dim">384 tests · fully offline · 100% line coverage</span></li>
+          <li><span class="dim">Live Arm leg measured on Neoverse&#8209;N2 · no throughput multiplier extrapolated to your model</span></li>
           <li><span class="dim">Replay data is synthetic and labeled at every layer</span></li>
         </ul>
       </div>

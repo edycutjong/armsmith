@@ -27,11 +27,14 @@
     replace the single <path> inside #qr-svg.
 
   HONESTY CONTRACT (do not edit numbers casually)
-    Every number in this deck traces to the repo: 219 offline tests, ~93%
+    Every number in this deck traces to the repo: 384 offline tests, 100%
     coverage, 13 rules, 10 Arm Learning Path citations, 6→4 kept/2 dropped
-    on the ragserve replay seed, witness 0→4 dotprod. There are NO hardware
-    throughput numbers anywhere — the live Graviton multiplier is [PENDING]
-    and is labeled as such. Keep it that way.
+    on the ragserve replay seed, witness 0→4 dotprod (replay fixture).
+    ONE hardware measurement is claimed, and only one: the int8 microkernel
+    A/B on a GitHub ubuntu-24.04-arm runner (Neoverse-N2, gcc 13.3.0) —
+    SDOT 0→1, median 0.059975s → 0.008123s, −86.5% (7.4×), noise band
+    ±0.000144s, gate keep. It is one microkernel on one runner and must
+    never be extrapolated to anyone's model throughput. Keep it that way.
 -->
 <html lang="en">
 <head>
@@ -815,7 +818,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
       <span class="callout" aria-hidden="true">1</span>
       <div class="term"><div class="term-bar"><i></i><i></i><i></i><span class="term-title">the harness — offline</span></div>
       <div class="term-body"><span class="p">$</span> python -m pytest -q
-<span class="ok">219 passed</span> <span class="d">— fully offline · ~93% line coverage</span>
+<span class="ok">384 passed</span> <span class="d">— fully offline · 100% line coverage</span>
 
 <span class="p">$</span> armsmith scan fixtures/replays/scenario_ragserve
 <span class="d">static rules on a real directory — zero hardware:</span>
@@ -921,20 +924,20 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
   <h2 class="rise">Counted real. Labeled pending.</h2>
   <div class="tract rise">
     <div>
-      <h3><b>■</b> real today — runs offline on any machine</h3>
+      <h3><b>■</b> real today — verifiable by a judge</h3>
       <div class="numgrid">
-        <div><div class="n">219<i>✓</i></div><p>pytest tests passing · ~93% line coverage · zero network</p></div>
+        <div><div class="n">&minus;86.5<i>%</i></div><p>measured on a Neoverse&#8209;N2 runner · <b>SDOT 0→1</b> · gate <b>keep</b> · signed report</p></div>
+        <div><div class="n">384<i>✓</i></div><p>pytest tests passing · 100% line coverage · zero network</p></div>
         <div><div class="n">13<i>+13</i></div><p>aarch64 rules → 13 exported x86→Arm migration-template cards</p></div>
         <div><div class="n">10<i>/13</i></div><p>rules citing an Arm Learning Path — the judges' own curriculum</p></div>
         <div><div class="n">7<i>cmd</i></div><p>scan · diagnose · witness · verify · pr · ci · rules export</p></div>
-        <div><div class="n">3<i>×2</i></div><p>CI matrix: 2 native arm64 runners + 1 x86 runner × Python 3.11 / 3.12 (6 jobs)</p></div>
-        <div><div class="n">MIT</div><p>public signed-report JSON schema + importable benchstats / gate / report / witness modules</p></div>
+        <div><div class="n">8<i>jobs</i></div><p>CI per push — including <b>5 native arm64</b> legs (4 test + 1 live bench)</p></div>
       </div>
     </div>
     <div class="pending">
       <h3><b class="e">■</b> not yet claimed — and the tool says so</h3>
       <ul>
-        <li><span class="badge">[PENDING]</span><span>Live Graviton throughput multiplier — <b>not yet measured</b>; no hardware number appears anywhere.</span></li>
+        <li><span class="badge">not extrapolated</span><span>A throughput multiplier for <b>your</b> model. The measured &minus;86.5% is one int8 microkernel on one runner — it proves the gate on real silicon, and is never scaled up into a claim about your workload.</span></li>
         <li><span class="badge">synthetic</span><span>Replay bundles are labeled <b>synthetic: true</b> at every layer; loaders refuse unlabeled data.</span></li>
         <li><span class="badge">TODO(S1)</span><span>Live perf/PMU · llama-bench capture on target hardware.</span></li>
         <li><span class="badge">TODO(S1)</span><span>Claude planner tool-use loop — deterministic fallback planner today.</span></li>
@@ -945,9 +948,10 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
     </div>
   </div>
   <div class="ghost" aria-hidden="true">09</div>
-  <aside class="speaker-notes">Phase one is hardware-free and says so in every artifact. 219 tests,
-  all offline. The left column is verifiable today; the right column is marked PENDING or TODO in
-  the code — the loaders literally refuse measurement data that isn't labeled synthetic.</aside>
+  <aside class="speaker-notes">The core is hardware-free and says so in every artifact — 384 tests,
+  all offline — and exactly one leg is real silicon: the int8 A/B on a Neoverse-N2 runner, which is
+  where the &minus;86.5% comes from. The left column is verifiable today; the right column is marked
+  TODO in the code — the loaders literally refuse measurement data that isn't labeled synthetic.</aside>
 </section>
 </div>
 
@@ -962,7 +966,7 @@ h2{font-size:104px;margin-bottom:26px;max-width:1500px}
       <div class="term-body"><span class="p">$</span> git clone https://github.com/edycutjong/armsmith &amp;&amp; cd armsmith
 <span class="p">$</span> python -m venv .venv &amp;&amp; source .venv/bin/activate
 <span class="p">$</span> pip install -e '.[dev]'
-<span class="p">$</span> python -m pytest -q                              <span class="d"># </span><span class="ok">219 passed</span><span class="d"> · offline</span>
+<span class="p">$</span> python -m pytest -q                              <span class="d"># </span><span class="ok">384 passed</span><span class="d"> · offline</span>
 <span class="p">$</span> armsmith scan fixtures/replays/scenario_ragserve <span class="d"># static rules, zero hw</span>
 <span class="p">$</span> armsmith diagnose --replay fixtures/replays/scenario_ragserve
                                                     <span class="d"># </span><span class="ok">4 kept</span><span class="d"> · </span><span class="no">2 dropped</span>
