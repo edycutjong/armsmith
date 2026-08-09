@@ -40,22 +40,6 @@
   [![KleidiAI](https://img.shields.io/badge/KleidiAI-micro--kernels-0091BD)](https://gitlab.arm.com/kleidi/kleidiai)
   [![llama.cpp](https://img.shields.io/badge/llama.cpp-GGUF%20repack-303030)](https://github.com/ggml-org/llama.cpp)
 
-  <sub><b>Built with</b></sub><br/>
-  [![Typer](https://img.shields.io/badge/Typer-CLI-0B7285)](https://typer.tiangolo.com/)
-  [![Rich](https://img.shields.io/badge/Rich-tables-0B7285)](https://github.com/Textualize/rich)
-  [![cryptography](https://img.shields.io/badge/cryptography-ed25519-2E7D32)](https://cryptography.io/)
-  [![jsonschema](https://img.shields.io/badge/jsonschema-2020--12-2E7D32)](https://json-schema.org/)
-  [![PyYAML](https://img.shields.io/badge/PyYAML-rule%20packs-2E7D32)](https://pyyaml.org/)
-  [![Vercel](https://img.shields.io/badge/Vercel-site-000000?logo=vercel&logoColor=white)](https://vercel.com/)
-
-  <sub><b>Quality gates</b></sub><br/>
-  [![pytest](https://img.shields.io/badge/pytest-386%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
-  [![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
-  [![mypy](https://img.shields.io/badge/mypy-typed-1F5082)](https://mypy-lang.org/)
-  [![CodeQL](https://img.shields.io/badge/CodeQL-0%20alerts-2088FF?logo=github&logoColor=white)](https://github.com/edycutjong/armsmith/security/code-scanning)
-  [![TruffleHog](https://img.shields.io/badge/TruffleHog-secret%20scan-8B5CF6)](https://github.com/trufflesecurity/trufflehog)
-  [![GitHub Actions](https://img.shields.io/badge/CI-arm64%20runners-2088FF?logo=githubactions&logoColor=white)](https://github.com/edycutjong/armsmith/actions)
-
 </div>
 
 ---
@@ -63,17 +47,22 @@
 Armsmith profiles an AI repo on Arm, diagnoses *why*
 it is slow on aarch64 with a 13-rule anti-pattern pack, drafts fixes, and renders a PR in which
 **every fix has passed a reproduce-benchmark gate** — median-of-N, MAD noise bands, output-hash
-equality. (PR rendering is dry-run today — it prints exactly what would ship and makes no network
-call. Posting is [on the roadmap](#-roadmap), marked in code rather than implied here.) The LLM plans; the silicon decides. In-band deltas are reported as *no change*, never as
-wins, and dropped fixes are reported, never hidden.
+equality. **The LLM plans; the silicon decides.** In-band deltas are reported as *no change*, never
+as wins, and dropped fixes are reported, never hidden.
 
-**Status: hardware-free core + one live Arm leg.** `386` pytest tests, all green, at **100% line coverage**. The rule pack, the
-planner and the diagnose loop run against **replay bundles** — recorded/synthetic instrument outputs
-labeled `"synthetic": true` at every layer and refused by every loader when unlabeled. Exactly one
-path produces real hardware numbers, `armsmith bench-live` ([see below](#measured-on-real-arm-silicon)),
-and its reports carry `"mode": "live"`, `"synthetic": false`. **Every number in this repo is one or the
-other, and says which.** The remaining live instruments (perf/PMU, Performix, llama-bench, hyperfine,
-cosign-in-CI, the Claude planner loop, PR posting) land at S1 and are marked `TODO(S1)` in code.
+*(PR rendering is dry-run today: it prints exactly what would ship and makes no network call.
+Posting is [on the roadmap](#-roadmap) and marked in code rather than implied here.)*
+
+```bash
+git clone https://github.com/edycutjong/armsmith && cd armsmith
+python3 -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
+python -m pytest -q                                       # 386 passing, offline
+armsmith diagnose --replay fixtures/replays/scenario_ragserve   # 4 kept · 2 dropped
+```
+
+No Arm hardware, no network, no API key. Full walkthrough in
+[Getting Started](#-getting-started) · every gate at once with `make all` · extending the rule pack:
+[CONTRIBUTING](.github/CONTRIBUTING.md).
 
 ## 💡 The Problem & Solution
 
@@ -107,6 +96,17 @@ A fix is kept only if it beats the measured noise band **and** produces byte-ide
 that fail are reported with reasons, never dropped silently. The report embeds the raw samples, so
 `armsmith verify` recomputes every statistic and every verdict independently — you never have to
 trust the number that was printed at you.
+
+### What is measured, and what is replayed
+
+**Status: hardware-free core + one live Arm leg.** `386` pytest tests, all green, at **100% line
+coverage**. The rule pack, the planner and the diagnose loop run against **replay bundles** —
+recorded/synthetic instrument outputs labeled `"synthetic": true` at every layer and refused by
+every loader when unlabeled. Exactly one path produces real hardware numbers, `armsmith bench-live`
+([see below](#measured-on-real-arm-silicon)), and its reports carry `"mode": "live"`,
+`"synthetic": false`. **Every number in this repo is one or the other, and says which.** The
+remaining live instruments (perf/PMU, Performix, llama-bench, hyperfine, cosign-in-CI, the Claude
+planner loop, PR posting) land at S1 and are marked `TODO(S1)` in code.
 
 ## 🏗️ Architecture & Tech Stack
 
@@ -228,6 +228,22 @@ jobs:
 ```
 
 ## 📊 Engineering Rigor
+
+<sub><b>Built with</b></sub><br/>
+[![Typer](https://img.shields.io/badge/Typer-CLI-0B7285)](https://typer.tiangolo.com/)
+[![Rich](https://img.shields.io/badge/Rich-tables-0B7285)](https://github.com/Textualize/rich)
+[![cryptography](https://img.shields.io/badge/cryptography-ed25519-2E7D32)](https://cryptography.io/)
+[![jsonschema](https://img.shields.io/badge/jsonschema-2020--12-2E7D32)](https://json-schema.org/)
+[![PyYAML](https://img.shields.io/badge/PyYAML-rule%20packs-2E7D32)](https://pyyaml.org/)
+[![Vercel](https://img.shields.io/badge/Vercel-site-000000?logo=vercel&logoColor=white)](https://vercel.com/)
+
+<sub><b>Quality gates</b></sub><br/>
+[![pytest](https://img.shields.io/badge/pytest-386%20tests-0A9EDC?logo=pytest&logoColor=white)](https://docs.pytest.org/)
+[![Ruff](https://img.shields.io/badge/Ruff-linted-D7FF64?logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
+[![mypy](https://img.shields.io/badge/mypy-typed-1F5082)](https://mypy-lang.org/)
+[![CodeQL](https://img.shields.io/badge/CodeQL-0%20alerts-2088FF?logo=github&logoColor=white)](https://github.com/edycutjong/armsmith/security/code-scanning)
+[![TruffleHog](https://img.shields.io/badge/TruffleHog-secret%20scan-8B5CF6)](https://github.com/trufflesecurity/trufflehog)
+[![GitHub Actions](https://img.shields.io/badge/CI-arm64%20runners-2088FF?logo=githubactions&logoColor=white)](https://github.com/edycutjong/armsmith/actions)
 
 | metric | value |
 |---|---|
