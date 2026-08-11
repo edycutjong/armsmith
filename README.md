@@ -6,7 +6,7 @@
 
   <p>
     <strong>On a GitHub <code>ubuntu-24.04-arm</code> runner (Neoverse-N2), Armsmith measured its own
-    R2 fix at <code>SDOT 0 → 1</code> and <code>−86.5%</code> kernel time — then signed the report and
+    R2 fix at <code>SDOT 0 → 1</code> and <code>−86.4%</code> kernel time — then signed the report and
     re-derived every statistic from the raw samples.</strong><br/>
     Reproduce it in ~2 minutes on any x86 laptop, no Arm hardware required:
     <a href="#-getting-started">Getting Started</a>.
@@ -131,9 +131,10 @@ trust the number that was printed at you.
 
 ### What is measured, and what is replayed
 
-**Status: hardware-free core + one live Arm leg.** `457` pytest tests, all green, at **100% line
-coverage**. The rule pack, the planner and the diagnose loop run against **replay bundles**, and a
-bundle is one of two things, always labeled:
+**Status: hardware-free core + three live Arm legs.** `457` pytest tests, all green, at **100% line
+coverage** (a 458th is skipped off-aarch64 — it needs `gcc` + `objdump` on Arm, and runs on the four
+native arm64 legs). The rule pack, the planner and the diagnose loop run against **replay bundles**,
+and a bundle is one of two things, always labeled:
 
 | bundle | manifest | where it comes from |
 |---|---|---|
@@ -333,8 +334,9 @@ armsmith record . --out ./armsmith-bundle
 | Tests | **457** passing, **100%** line coverage |
 | CI jobs per push | 10 — incl. **5 native arm64** (4 test legs + 1 live bench, 2 measured ISA extensions) |
 | Rules | 13, each with a citation + positive/negative fixtures |
-| Live Arm speedup (measured) | **7.4× / −86.5%**, outside a ±0.24% noise band |
-| ISA witness | `SDOT 0 → 1` in the hot symbol, from real disassembly |
+| Live Arm speedup (measured) | **7.3× / −86.4%** (SDOT) and **3.6× / −72.0%** (SMMLA), both outside their noise bands |
+| ISA witness | `SDOT 0 → 1` and `SMMLA 0 → 1` in the hot symbol, from real disassembly |
+| Probe rules on real silicon | **6 rules ran** on a bundle recorded from the arm64 runner (`"synthetic": false`) |
 | Report integrity | ed25519 signature + sha256 content hash + full statistic recompute |
 | Security | CodeQL **0 alerts** · TruffleHog (full history) · Dependabot · pip-audit |
 
@@ -361,19 +363,38 @@ path, and both builds must still produce the same checksum or the gate drops the
 Latest run, on a **GitHub-hosted `ubuntu-24.04-arm` runner** ([`ci.yml`](.github/workflows/ci.yml) →
 job *Live Arm reproduce gate*), host **Neoverse-N2**, `gcc 13.3.0`:
 
-Figures below are from CI run
-[**31301665280**](https://github.com/edycutjong/armsmith/actions/runs/31301665280), copied out of
-its signed `report-live.json` artifact:
+Both tables below are from the **same** CI run,
+[**31305726894**](https://github.com/edycutjong/armsmith/actions/runs/31305726894), copied out of
+its signed `report-live.json` / `report-live-mmla.json` artifacts:
+
+**Case 1 — `dot`: SDOT under `+dotprod`**
 
 | | `baseline` = `-O3 -march=armv8-a` | `fix_R2` = `-O3 -march=armv8.2-a+dotprod` |
 |---|---|---|
 | **SDOT in `dot_i8`** | **0** | **1** |
-| median `kernel_s` | 0.059922 s | **0.008160 s** |
-| p95 | 0.059972 s | 0.008178 s |
-| Δ median | — | **−0.051762 s (−86.4%, a 7.3× speedup)** |
-| noise band (k=3) | — | ±0.000239 s |
+| median `kernel_s` | 0.059897 s | **0.008157 s** |
+| p95 | 0.059951 s | 0.008195 s |
+| Δ median | — | **−0.051740 s (−86.4%, a 7.3× speedup)** |
+| noise band (k=3) | — | ±0.000177 s |
 | output hash equal | — | ✅ identical |
 | **gate verdict** | — | **`keep`** |
+
+**Case 2 — `mmla`: SMMLA under `+i8mm`**
+
+| | `baseline` = `-O3 -march=armv8-a` | `fix_i8mm` = `-O3 -march=armv8.2-a+i8mm` |
+|---|---|---|
+| **SMMLA in the matmul kernel** | **0** | **1** |
+| median `kernel_s` | 3.472863 s | **0.971807 s** |
+| p95 | 3.481130 s | 0.979354 s |
+| Δ median | — | **−2.501057 s (−72.0%, a 3.6× speedup)** |
+| noise band (k=3) | — | ±0.011665 s |
+| output hash equal | — | ✅ identical |
+| **gate verdict** | — | **`keep`** |
+
+Two different ISA extensions, two different instructions, two independent `keep` verdicts through
+one unmodified gate. The smaller win on case 2 is the honest one to report: `SMMLA` does more
+arithmetic per instruction but the kernel is memory-shaped, so the speedup lands at 3.6× rather
+than 7.3×. A tool that reported both as "~7×" would be the thing this project exists to prevent.
 
 **The last digits move between runs, and that is the point.** This job re-measures on every push, so
 a run today reports −86.4% where an earlier one reported −86.5%; the noise band moves with it. A
@@ -383,7 +404,7 @@ recomputes every statistic from the embedded raw samples.
 
 Read that first row before the timings. ARMv8.0 has no dot-product instruction, so the baseline
 *cannot* contain one; enabling the ISA level lets GCC's vectorizer emit `SDOT` and the whole
-accumulate collapses into it. The stopwatch says 7.4×, but the disassembly says *why*, and a
+accumulate collapses into it. The stopwatch says 7.3×, but the disassembly says *why*, and a
 disassembly is not a benchmark you can argue with.
 
 The measurement is not special-cased anywhere: the samples go through the same
@@ -398,6 +419,38 @@ armsmith verify report-live.json            # hash + ed25519 + schema + recomput
 
 CI runs exactly those two commands on every push and uploads the signed report as a build artifact,
 so the numbers above are re-derivable by anyone with the repo and an Arm runner — including you.
+
+#### The third live leg: `record` → `diagnose` on hardware nobody authored
+
+The two cases above measure a kernel Armsmith ships. The obvious objection is that the *probe rules*
+— the ones that read your `lscpu`, your BLAS, your pip log — still only ever see fixtures we wrote.
+So the same arm64 job records a bundle from the runner itself and diagnoses it:
+
+```bash
+pip install -v numpy 2>&1 | tee pip-install.log       # R8 reads this
+gcc -O3 -march=armv8-a -v -o /tmp/probe-kernel ... 2> build.log   # R2 reads this
+armsmith record . --out ./arm-bundle --python /tmp/probe-venv/bin/python \
+  --pip-log pip-install.log --build-log build.log     # lscpu + THP captured here
+armsmith diagnose --replay ./arm-bundle --pr-dry-run
+```
+
+Every input is observed on the runner; nothing is hand-written. The resulting manifest carries
+`"synthetic": false`, and the report's host block reads **`Neoverse-N2`, `aarch64`,
+`dotprod i8mm sve sve2 bf16`** — read off the silicon, not declared by us.
+
+| from the recorded run | |
+|---|---|
+| rules that RAN on observed data | **6** — R1, R2, R3, R4, R8, R12 |
+| of those, `matched` / `clean` | 3 matched (R1, R3, R4) · 3 clean (R2, R8, R12) |
+| rules skipped for want of an instrument | 7 — R5, R6, R7, R9, R10, R11, R13 |
+
+**A green tick must not be reachable by a bundle that captured nothing**, so the job asserts on the
+way through: `synthetic is False`, `lscpu` present, at least one probe rule enabled, and `>= 4` rules
+actually run rather than all quietly skipping. If a future change made `record` produce an empty
+bundle, this job fails instead of printing a reassuring nothing.
+
+The 7 skips are reported, not hidden — that is the same refuse-to-claim rule applied to coverage
+instead of to timings.
 
 ### The Trust Chain
 
@@ -435,7 +488,7 @@ so the numbers above are re-derivable by anyone with the repo and an Arm runner 
 - `LiveProbe` **refuses** the `env` and `proc_maps` probes even though it could trivially serve
   them: a report is a published artifact, and a CI environment block contains tokens. Every probe it
   cannot answer honestly raises instead of guessing.
-- The live 7.4× is one microbenchmark on one runner, not a claim about your model. It is there to
+- The live 7.3× is one microbenchmark on one runner, not a claim about your model. It is there to
   prove the *gate* works on real silicon; the honest way to get your number is to run it on yours.
 - The `benchstats` module is shared with the Assayer project (declared in both repos).
 
