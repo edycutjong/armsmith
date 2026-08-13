@@ -1,6 +1,68 @@
 # CHANGELOG
 
 
+## v1.3.3 (2026-08-13)
+
+### Bug Fixes
+
+- **a11y**: Clear WCAG AA on the light-theme footer and the deck home link
+  ([`5963fd5`](https://github.com/edycutjong/armsmith/commit/5963fd5d1db3d6406a9a3219f0d97801e6105604))
+
+The footer sits on --bg2 (#F1EDE3) but painted its column headings and the "faked 0" counter with
+  --orange (#A85B00) — 4.31:1, under the 4.5:1 AA floor for text that size. --orange-on-alt
+  (#8F4E00) exists for exactly this background and measures 5.52:1. Dark theme is unaffected: both
+  variables resolve to #F7941E there.
+
+The deck's home link read "armsmith.edycu.dev ↗" but announced "Back to the Armsmith landing page",
+  so its visible text was absent from its accessible name — voice-control users could not activate
+  it by what they see. The label now leads with the visible text.
+
+Verified with axe-core at 390x844: 0 color-contrast nodes on index.html, 0
+  label-content-name-mismatch nodes on deck.html.
+
+### Documentation
+
+- Point the demo links at the reordered cut
+  ([`2a5435c`](https://github.com/edycutjong/armsmith/commit/2a5435c6981f4baa719342ce81ad1bb5195f3b39))
+
+The published video now leads with the Arm hardware proof at 0:10 instead of 1:40. A judge who stops
+  at sixty seconds previously never saw the thing this challenge weights at 40%; now it is the
+  second beat, right after the cold open.
+
+The narration was re-recorded for that position — the old line opened 'And it is faster', written to
+  follow the replay beat and a non-sequitur as the second thing you hear. It now answers the cold
+  open directly.
+
+YouTube cannot swap a file, so this is a new id: JsT83BYMWd0 -> 5lRE-VQl_oM. CHANGELOG keeps the old
+  one; it is generated release history and accurate as written.
+
+- The Action is on the Marketplace — retire the publish-pending caveat
+  ([`7abaaff`](https://github.com/edycutjong/armsmith/commit/7abaaffc26a2082f2f01e928b3ad094d18611736))
+
+README and action.yml both said the Marketplace listing was 'publish-pending, never claimed as
+  live'. That was true when written and is now false: the listing is live from v1.3.2 as 'Armsmith
+  Arm performance gate'. A stale disclaimer is a smaller sin than a stale claim, but on this project
+  neither is acceptable.
+
+- **readme**: Report all three live Arm legs, and cite one run for both cases
+  ([`2fdc46a`](https://github.com/edycutjong/armsmith/commit/2fdc46a530074d1c1c0fb934d9f776c28c6c6c13))
+
+The README claimed "hardware-free core + one live Arm leg" while CI has been running three on every
+  push. That undersold the strongest evidence in the repo.
+
+- both bench-live cases now cite the SAME run (31305726894) instead of the dot table quoting an
+  older one, so the two tables are mutually checkable - add the SMMLA/+i8mm results table: 3.6x /
+  -72.0%, band +/-0.011665, keep. Reported next to the 7.3x dot case precisely because it is the
+  smaller win — the kernel is memory-shaped and saying "~7x" for both is the failure mode this
+  project exists to prevent - document the third leg at all: record -> diagnose on the arm64 runner,
+  where 6 rules run against observed lscpu/BLAS/pip/build data ("synthetic": false) and 7 skip for
+  want of an instrument. The skips are reported, not hidden - headline numbers (top matter, metrics
+  table, honesty notes) realigned from 7.4x/-86.5% to the cited run's 7.3x/-86.4% - disclose the
+  458th test: skipped off-aarch64, runs on the native arm64 legs
+
+No code change; 457 passing + 100% line coverage unaffected.
+
+
 ## v1.3.2 (2026-08-09)
 
 ### Bug Fixes
